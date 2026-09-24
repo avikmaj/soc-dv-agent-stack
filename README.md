@@ -2,7 +2,7 @@
 
 A vendor-neutral, evidence-gated agent foundation for ASIC/SoC design and design verification. It provides one canonical skill library with project-local adapters for **Claude Code** and **OpenAI Codex**.
 
-> Status: v0.1 production-ready foundation. It supplies disciplined workflows, schemas, validation, and safety controls; it does not replace signoff tools, licensed VIP, engineering judgment, or company methodology.
+> Status: v0.1 public foundation under active validation. It supplies disciplined workflows, schemas, validation, and safety controls; it does not replace signoff tools, licensed VIP, engineering judgment, or company methodology. Review the open findings in `docs/issues/stack-issue-register.md` and `docs/audits/2026-09-24/static-security-audit.md` before production or confidential-design use.
 
 ## Scope
 
