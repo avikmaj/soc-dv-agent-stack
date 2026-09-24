@@ -2,7 +2,8 @@
 
 ## 0.1.0 - 2026-09-24
 
-- Initial production-ready foundation.
+- Initial public foundation under active validation; not a production-readiness claim.
+- See `docs/issues/stack-issue-register.md` and `docs/audits/2026-09-24/static-security-audit.md` for open findings and evidence gaps.
 - Twenty canonical design/DV skills.
 - Claude Code and Codex project-local adapters.
 - JSON schemas for verification plans, traceability, regression results, and waivers.
