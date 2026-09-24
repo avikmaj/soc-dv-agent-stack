@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/avikmaj/soc-dv-agent-stack/schemas/waiver.schema.json",
+  "title": "Verification Waiver",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "category",
+    "target",
+    "rationale",
+    "evidence",
+    "owner",
+    "approver",
+    "expiry",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "id": {
+      "type": "string"
+    },
+    "category": {
+      "enum": [
+        "coverage",
+        "cdc",
+        "rdc",
+        "lint",
+        "formal",
+        "protocol",
+        "other"
+      ]
+    },
+    "target": {
+      "type": "string"
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 10
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "owner": {
+      "type": "string"
+    },
+    "approver": {
+      "type": "string"
+    },
+    "expiry": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "enum": [
+        "proposed",
+        "approved",
+        "rejected",
+        "expired"
+      ]
+    }
+  }
+}

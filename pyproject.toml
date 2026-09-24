@@ -1,0 +1,9 @@
+[project]
+name = "soc-dv-agent-stack"
+version = "0.1.0"
+description = "Vendor-neutral AI agent skills for ASIC/SoC design verification"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+[tool.ruff]
+line-length = 120

@@ -1,0 +1,12 @@
+name: Skill proposal
+description: Propose a vendor-neutral design/DV skill
+body:
+  - type: textarea
+    attributes: {label: Engineering problem}
+    validations: {required: true}
+  - type: textarea
+    attributes: {label: Inputs and evidence}
+    validations: {required: true}
+  - type: textarea
+    attributes: {label: Safety and license considerations}
+    validations: {required: true}

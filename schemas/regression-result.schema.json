@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/avikmaj/soc-dv-agent-stack/schemas/regression-result.schema.json",
+  "title": "Regression Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "tool",
+    "started_at",
+    "tests"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "tool": {
+      "type": "string"
+    },
+    "tool_version": {
+      "type": "string"
+    },
+    "git_commit": {
+      "type": "string"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "seed",
+          "status"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "seed": {
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "fail",
+              "error",
+              "timeout",
+              "skipped"
+            ]
+          },
+          "signature": {
+            "type": "string"
+          },
+          "first_error": {
+            "type": "string"
+          },
+          "log": {
+            "type": "string"
+          },
+          "duration_seconds": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}

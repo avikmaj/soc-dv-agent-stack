@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0",
+  "project_root": ".",
+  "allowed_workdirs": [
+    "."
+  ],
+  "environment_allowlist": [
+    "PATH",
+    "HOME",
+    "USER",
+    "LM_LICENSE_FILE",
+    "SNPSLMD_LICENSE_FILE",
+    "CDS_LIC_FILE",
+    "MGLS_LICENSE_FILE"
+  ],
+  "tools": {
+    "lint": {
+      "argv": [
+        "verilator",
+        "--lint-only",
+        "-Wall",
+        "-f",
+        "files.f"
+      ],
+      "cwd": ".",
+      "timeout_seconds": 600
+    },
+    "sim": {
+      "argv": [
+        "make",
+        "-C",
+        "sim",
+        "smoke"
+      ],
+      "cwd": ".",
+      "timeout_seconds": 3600
+    },
+    "formal": {
+      "argv": [
+        "sby",
+        "-f",
+        "formal/default.sby"
+      ],
+      "cwd": ".",
+      "timeout_seconds": 3600
+    }
+  }
+}

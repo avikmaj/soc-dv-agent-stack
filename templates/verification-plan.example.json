@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "project": "example",
+  "scope": "Replace with approved scope",
+  "assumptions": [
+    "Clock/reset specification is pending approval"
+  ],
+  "requirements": [
+    {
+      "id": "REQ-RESET_001",
+      "text": "DUT returns to the documented idle state after reset",
+      "priority": "P0",
+      "methods": [
+        "simulation",
+        "assertion"
+      ],
+      "checks": [
+        "Reset-state scoreboard check"
+      ],
+      "coverage": [
+        "Reset asserted in each legal operating state"
+      ],
+      "assumptions": []
+    }
+  ],
+  "risks": [
+    {
+      "id": "RISK-RESET_001",
+      "description": "Asynchronous reset release may create inconsistent state",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "RDC analysis plus randomized reset-release tests",
+      "owner": "TBD"
+    }
+  ],
+  "signoff_criteria": [
+    "Every P0/P1 requirement has current passing evidence"
+  ]
+}

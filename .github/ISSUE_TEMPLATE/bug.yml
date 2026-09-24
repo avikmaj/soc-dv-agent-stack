@@ -1,0 +1,12 @@
+name: Bug report
+description: Report a reproducible stack defect
+body:
+  - type: textarea
+    attributes: {label: Problem, description: Do not include confidential design data.}
+    validations: {required: true}
+  - type: textarea
+    attributes: {label: Reproduction}
+    validations: {required: true}
+  - type: input
+    attributes: {label: Commit or release}
+    validations: {required: true}
