@@ -22,10 +22,20 @@ calls, so a same-user attacker racing between them (TOCTOU) can still win a narr
 deletion path walks the directory chain with O_NOFOLLOW|O_DIRECTORY file descriptors and, on Python 3.11+,
 deletes relative to that descriptor, which closes the window for the delete step; the rename steps and all
 Windows code paths rely on lstat-based checks made immediately before the operation.
+
+File-level helpers (remediation of audit finding F2, used by scripts/bootstrap.py): ``chain_state``,
+``classify_destination``, ``read_regular_nofollow``, ``write_regular_atomically``, ``mkdir_chain``,
+``unlink_regular_nofollow``, ``rmdir_if_empty`` and ``replace_regular_nofollow`` apply the same rules to single
+files below a root directory: no link-like component anywhere in the chain (a dangling link is a link), no
+directory or special file where a regular file is expected, no regular file with more than one hard link as a
+write destination, temporary-file-plus-rename replacement in the destination directory, and, on POSIX, file
+operations relative to a directory descriptor opened with O_NOFOLLOW at every step.
 """
 from __future__ import annotations
 
+import errno
 import filecmp
+import hashlib
 import os
 import secrets
 import shutil
@@ -35,9 +45,11 @@ from pathlib import Path, PurePosixPath
 
 __all__ = [
     "FsSafetyError", "UnsafePathError", "SourceTreeError", "SwapError", "LeftoverStateError",
-    "is_link_like", "describe_link", "check_chain", "assert_contained", "scan_tree", "tree_manifest",
-    "trees_equal", "find_leftovers", "safe_rmtree", "replace_tree_atomically", "copy_file",
+    "is_link_like", "describe_link", "lstat_or_none", "check_chain", "assert_contained", "scan_tree",
+    "tree_manifest", "trees_equal", "find_leftovers", "safe_rmtree", "replace_tree_atomically", "copy_file",
     "STAGED_PREFIX", "OLD_PREFIX",
+    "sha256_bytes", "chain_state", "classify_destination", "read_regular_nofollow", "write_regular_atomically",
+    "mkdir_chain", "unlink_regular_nofollow", "rmdir_if_empty", "replace_regular_nofollow", "TMP_INFIX",
 ]
 
 # Windows marks junctions (and every other reparse point) with this attribute; symlinks additionally set S_IFLNK.
@@ -100,6 +112,11 @@ def _lstat(path: Path) -> os.stat_result | None:
         return os.lstat(path)
     except (FileNotFoundError, NotADirectoryError):
         return None
+
+
+def lstat_or_none(path: Path) -> os.stat_result | None:
+    """lstat without following the final component; None when the path (or one of its parents) is missing."""
+    return _lstat(Path(path))
 
 
 def _relative_inside(root: Path, path: Path) -> PurePosixPath:
@@ -390,3 +407,274 @@ def replace_tree_atomically(root: Path, source: Path, target: Path, *, dry_run: 
                             f"could not be removed ({exc})") from exc
         return f"replaced {rel_target} ({n_files} files)"
     return f"created {rel_target} ({n_files} files)"
+
+
+# --------------------------------------------------------------------------- single-file helpers (F2)
+TMP_INFIX = ".tmp-"
+
+# Directory-descriptor-relative operations close the leaf-level race between check and use. They need POSIX
+# O_NOFOLLOW/O_DIRECTORY and dir_fd support for every call used below; elsewhere (Windows) the helpers fall back
+# to lstat checks made immediately before each path-based operation.
+_DIR_FD_OPS = os.name == "posix" and hasattr(os, "O_NOFOLLOW") and hasattr(os, "O_DIRECTORY") and all(
+    fn in os.supports_dir_fd for fn in (os.open, os.replace, os.unlink, os.lstat))
+_O_NOFOLLOW = getattr(os, "O_NOFOLLOW", 0)
+_O_BINARY = getattr(os, "O_BINARY", 0)
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _check_root(root: Path) -> None:
+    st_root = _lstat(root)
+    if st_root is None or not stat.S_ISDIR(st_root.st_mode):
+        raise UnsafePathError(f"{root}: root is not an existing directory")
+    if is_link_like(st_root):
+        raise UnsafePathError(f"{root}: root is a {describe_link(st_root)}; refusing")
+
+
+def chain_state(root: Path, path: Path) -> tuple[int, os.stat_result | None]:
+    """Walk ``root`` -> ``path`` with lstat, refusing any link-like component and any non-directory intermediate.
+
+    Returns ``(existing, leaf_stat)``: ``existing`` is the number of components below ``root`` that exist, and
+    ``leaf_stat`` is the lstat result of the leaf when every component exists (None otherwise). A dangling
+    symbolic link exists as far as lstat is concerned and is therefore refused like any other link.
+    """
+    root = Path(root)
+    path = Path(path)
+    parts = _relative_inside(root, path).parts
+    _check_root(root)
+    cur = root
+    st = None
+    for index, part in enumerate(parts):
+        cur = cur / part
+        st = _lstat(cur)
+        if st is None:
+            return index, None
+        if is_link_like(st):
+            raise UnsafePathError(f"{cur}: is a {describe_link(st)}; refusing to operate through it")
+        if index < len(parts) - 1 and not stat.S_ISDIR(st.st_mode):
+            raise UnsafePathError(f"{cur}: intermediate path component is not a directory")
+    return len(parts), st
+
+
+def classify_destination(root: Path, path: Path, *, allow_hard_links: bool = False) -> str:
+    """``"missing"`` or ``"file"`` (a plain regular file); every other state raises UnsafePathError.
+
+    Refused: any link-like component in the chain (including a dangling link at the leaf), a directory or special
+    file at the leaf, and, unless ``allow_hard_links`` is set, a regular file with more than one hard link (writing
+    it in place, or replacing it, would surprise whoever owns the other name).
+    """
+    root = Path(root)
+    path = Path(path)
+    _, st = chain_state(root, path)
+    assert_contained(root, path)
+    if st is None:
+        return "missing"
+    if stat.S_ISDIR(st.st_mode):
+        raise UnsafePathError(f"{path}: destination exists and is a directory")
+    if not stat.S_ISREG(st.st_mode):
+        raise UnsafePathError(f"{path}: destination exists and is not a regular file")
+    if not allow_hard_links and st.st_nlink > 1:
+        raise UnsafePathError(f"{path}: destination has {st.st_nlink} hard links; refusing to write a shared inode")
+    return "file"
+
+
+def _open_parent(root: Path, path: Path) -> int | None:
+    """POSIX: descriptor of ``path.parent`` reached from ``root`` with O_NOFOLLOW at every step; else None."""
+    if not _DIR_FD_OPS:
+        return None
+    return _open_dir_chain(root, Path(path).parent)
+
+
+def _read_fd(fd: int) -> bytes:
+    chunks = []
+    while True:
+        chunk = os.read(fd, 1 << 20)
+        if not chunk:
+            return b"".join(chunks)
+        chunks.append(chunk)
+
+
+def _write_fd(fd: int, data: bytes) -> None:
+    view = memoryview(data)
+    while view:
+        written = os.write(fd, view)
+        view = view[written:]
+
+
+def read_regular_nofollow(root: Path, path: Path, *, allow_hard_links: bool = False) -> bytes:
+    """Read the regular file at ``path`` (below ``root``) without following any link in its chain."""
+    root = Path(root)
+    path = Path(path)
+    if classify_destination(root, path, allow_hard_links=allow_hard_links) != "file":
+        raise UnsafePathError(f"{path}: file does not exist")
+    dfd = _open_parent(root, path)
+    try:
+        flags = os.O_RDONLY | _O_NOFOLLOW | _O_BINARY
+        try:
+            fd = os.open(path.name, flags, dir_fd=dfd) if dfd is not None else os.open(path, flags)
+        except OSError as exc:
+            if exc.errno == getattr(errno, "ELOOP", None):
+                raise UnsafePathError(f"{path}: became a symbolic link before it was opened; refusing") from exc
+            raise
+        try:
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode) or (not allow_hard_links and st.st_nlink > 1):
+                raise UnsafePathError(f"{path}: changed underneath us before reading; refusing")
+            return _read_fd(fd)
+        finally:
+            os.close(fd)
+    finally:
+        if dfd is not None:
+            os.close(dfd)
+
+
+def write_regular_atomically(root: Path, path: Path, data: bytes, *, mode: int = 0o644,
+                             expect_existing: bool | None = None) -> None:
+    """Create or replace the regular file at ``path`` (below ``root``) atomically and without following links.
+
+    Guards: link-free chain, containment, destination missing or a plain singly-linked regular file
+    (``expect_existing`` pins which of the two is acceptable). The bytes go to a sibling temporary file created
+    with O_CREAT|O_EXCL (O_NOFOLLOW where available), are fsync'ed, given ``mode``, and moved over the destination
+    with ``os.replace`` (same directory, hence same volume); the destination is re-checked with lstat immediately
+    before the rename. On any failure the temporary file is removed and the destination is left as it was.
+    """
+    root = Path(root)
+    path = Path(path)
+    kind = classify_destination(root, path)
+    if expect_existing is True and kind != "file":
+        raise UnsafePathError(f"{path}: expected an existing file to replace, found none")
+    if expect_existing is False and kind != "missing":
+        raise UnsafePathError(f"{path}: expected no existing file, found one")
+    parent = path.parent
+    st_parent = _lstat(parent)
+    if st_parent is None or not stat.S_ISDIR(st_parent.st_mode) or is_link_like(st_parent):
+        raise UnsafePathError(f"{parent}: destination directory is missing or not a plain directory")
+    tmp_name = f".{path.name}{TMP_INFIX}{os.getpid()}-{secrets.token_hex(4)}"
+    dfd = _open_parent(root, path)
+    tmp_created = False
+    try:
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | _O_NOFOLLOW | _O_BINARY
+        if dfd is not None:
+            fd = os.open(tmp_name, flags, 0o600, dir_fd=dfd)
+        else:
+            fd = os.open(parent / tmp_name, flags, 0o600)
+        tmp_created = True
+        try:
+            _write_fd(fd, data)
+            os.fsync(fd)
+            if hasattr(os, "fchmod"):
+                os.fchmod(fd, mode & 0o777)
+        finally:
+            os.close(fd)
+        try:
+            st_now = os.lstat(path.name, dir_fd=dfd) if dfd is not None else os.lstat(path)
+        except FileNotFoundError:
+            st_now = None
+        if st_now is not None and (kind == "missing" or is_link_like(st_now) or not stat.S_ISREG(st_now.st_mode)
+                                   or st_now.st_nlink > 1):
+            raise UnsafePathError(f"{path}: destination changed underneath us before the rename; refusing")
+        if dfd is not None:
+            os.replace(tmp_name, path.name, src_dir_fd=dfd, dst_dir_fd=dfd)
+            try:
+                os.fsync(dfd)
+            except OSError:  # pragma: no cover - directory fsync is best effort
+                pass
+        else:
+            os.replace(parent / tmp_name, path)
+        tmp_created = False
+    finally:
+        if tmp_created:
+            try:
+                if dfd is not None:
+                    os.unlink(tmp_name, dir_fd=dfd)
+                else:
+                    os.unlink(parent / tmp_name)
+            except OSError:  # pragma: no cover - nothing more can be done for a stray temporary file
+                pass
+        if dfd is not None:
+            os.close(dfd)
+
+
+def mkdir_chain(root: Path, directory: Path) -> list[Path]:
+    """Create the missing components of ``directory`` (below ``root``) one at a time as plain directories.
+
+    Returns the directories created, top-most first, so a caller can remove them again on rollback. Existing
+    components must be plain directories; a link anywhere in the chain is refused before anything is created.
+    """
+    root = Path(root)
+    directory = Path(directory)
+    if directory == root:
+        _check_root(root)
+        return []
+    existing, st = chain_state(root, directory)
+    assert_contained(root, directory)
+    parts = _relative_inside(root, directory).parts
+    if st is not None:
+        if not stat.S_ISDIR(st.st_mode):
+            raise UnsafePathError(f"{directory}: exists and is not a directory")
+        return []
+    created: list[Path] = []
+    cur = root.joinpath(*parts[:existing])
+    for part in parts[existing:]:
+        cur = cur / part
+        os.mkdir(cur, 0o755)
+        st_new = _lstat(cur)
+        if st_new is None or is_link_like(st_new) or not stat.S_ISDIR(st_new.st_mode):
+            raise UnsafePathError(f"{cur}: created directory changed underneath us; refusing")
+        created.append(cur)
+    return created
+
+
+def unlink_regular_nofollow(root: Path, path: Path, *, expect_sha256: str | None = None) -> None:
+    """Delete the regular file at ``path`` (below ``root``); with ``expect_sha256`` only if its content matches."""
+    root = Path(root)
+    path = Path(path)
+    if classify_destination(root, path) != "file":
+        raise UnsafePathError(f"{path}: not an existing regular file")
+    if expect_sha256 is not None and sha256_bytes(read_regular_nofollow(root, path)) != expect_sha256:
+        raise UnsafePathError(f"{path}: content differs from the recorded hash; refusing to delete it")
+    dfd = _open_parent(root, path)
+    try:
+        st = os.lstat(path.name, dir_fd=dfd) if dfd is not None else os.lstat(path)
+        if is_link_like(st) or not stat.S_ISREG(st.st_mode):
+            raise UnsafePathError(f"{path}: changed underneath us before deletion; refusing")
+        if dfd is not None:
+            os.unlink(path.name, dir_fd=dfd)
+        else:
+            os.unlink(path)
+    finally:
+        if dfd is not None:
+            os.close(dfd)
+
+
+def rmdir_if_empty(root: Path, path: Path) -> bool:
+    """Remove the plain directory at ``path`` (below ``root``) if it is empty; True when it is gone afterwards."""
+    root = Path(root)
+    path = Path(path)
+    if path == root:
+        return False
+    _, st = chain_state(root, path)
+    if st is None:
+        return True
+    if not stat.S_ISDIR(st.st_mode):
+        raise UnsafePathError(f"{path}: not a directory")
+    try:
+        os.rmdir(path)
+    except OSError as exc:
+        if exc.errno in (errno.ENOTEMPTY, errno.EEXIST):
+            return False
+        raise
+    return True
+
+
+def replace_regular_nofollow(root: Path, src: Path, dst: Path) -> None:
+    """Atomically move the regular file ``src`` over ``dst`` (both below ``root``); links and directories refused."""
+    root = Path(root)
+    src = Path(src)
+    dst = Path(dst)
+    if classify_destination(root, src) != "file":
+        raise UnsafePathError(f"{src}: not an existing regular file")
+    classify_destination(root, dst)
+    os.replace(src, dst)

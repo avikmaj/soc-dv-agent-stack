@@ -8,6 +8,8 @@ venv/
 !.env.example
 .soc-dv/runs/
 .soc-dv/cache/
+.soc-dv/journal/
+.soc-dv/backups/
 *.log
 *.vcd
 *.fst

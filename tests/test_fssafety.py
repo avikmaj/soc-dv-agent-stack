@@ -1,4 +1,5 @@
-"""Unit tests for scripts/fssafety.py (link-safe helpers behind the adapter sync; audit finding F1).
+"""Unit tests for scripts/fssafety.py (link-safe helpers behind the adapter sync and the installer; audit
+findings F1 and F2).
 
 Run: python3 -m unittest tests.test_fssafety -v
 
@@ -303,6 +304,129 @@ class ReplaceTests(unittest.TestCase):
                 fs.replace_tree_atomically(f.root, f.source, target)
             self.assertEqual(_listing(f.root), before)
             self.assertFalse(target.exists())
+
+
+class FileHelperTests(unittest.TestCase):
+    """Single-file helpers behind scripts/bootstrap.py (audit finding F2)."""
+
+    def test_chain_state_reports_missing_tail_and_refuses_links(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Fixture(d)
+            self.assertEqual(fs.chain_state(f.root, f.root / ".claude" / "skills" / "x" / "SKILL.md"), (1, None))
+            existing, st = fs.chain_state(f.root, f.source / "a" / "SKILL.md")
+            self.assertEqual(existing, 3)
+            self.assertTrue(stat.S_ISREG(st.st_mode))
+            with self.assertRaises(fs.UnsafePathError):
+                fs.chain_state(f.root, f.root)
+            _symlink_or_skip(self, f.root / "nowhere", f.root / "dangling")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.chain_state(f.root, f.root / "dangling")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.chain_state(f.root, f.root / "dangling" / "child")
+
+    def test_classify_destination(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Fixture(d)
+            self.assertEqual(fs.classify_destination(f.root, f.root / "new.txt"), "missing")
+            self.assertEqual(fs.classify_destination(f.root, f.root / ".claude" / "skills" / "x.txt"), "missing")
+            self.assertEqual(fs.classify_destination(f.root, f.source / "a" / "SKILL.md"), "file")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.classify_destination(f.root, f.source)  # a directory
+            _symlink_or_skip(self, f.external / "SIBLING.txt", f.root / "link.txt")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.classify_destination(f.root, f.root / "link.txt")
+            linked = f.root / "linked.txt"
+            try:
+                os.link(f.source / "a" / "SKILL.md", linked)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"hard links unavailable on this host: {exc}")
+            with self.assertRaises(fs.UnsafePathError) as cm:
+                fs.classify_destination(f.root, linked)
+            self.assertIn("hard links", str(cm.exception))
+            self.assertEqual(fs.classify_destination(f.root, linked, allow_hard_links=True), "file")
+
+    def test_write_regular_atomically_creates_replaces_and_refuses(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Fixture(d)
+            dst = f.root / "out.txt"
+            fs.write_regular_atomically(f.root, dst, b"one\n", mode=0o640, expect_existing=False)
+            self.assertEqual(dst.read_bytes(), b"one\n")
+            if os.name == "posix":
+                self.assertEqual(stat.S_IMODE(os.stat(dst).st_mode), 0o640)
+            fs.write_regular_atomically(f.root, dst, b"two\n", expect_existing=True)
+            self.assertEqual(dst.read_bytes(), b"two\n")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.write_regular_atomically(f.root, dst, b"x", expect_existing=False)
+            with self.assertRaises(fs.UnsafePathError):
+                fs.write_regular_atomically(f.root, f.root / "absent.txt", b"x", expect_existing=True)
+            with self.assertRaises(fs.UnsafePathError):
+                fs.write_regular_atomically(f.root, f.source, b"x")  # a directory
+            with self.assertRaises(fs.UnsafePathError):
+                fs.write_regular_atomically(f.root, f.root / "missing-dir" / "x.txt", b"x")  # parent missing
+            self.assertEqual(dst.read_bytes(), b"two\n")
+            self.assertEqual(sorted(p.name for p in f.root.iterdir()), [".claude", "out.txt", "skills"],
+                             "no temporary file may be left behind")
+            _symlink_or_skip(self, f.external / "SIBLING.txt", f.root / "link.txt")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.write_regular_atomically(f.root, f.root / "link.txt", b"leak\n")
+            self.assertEqual((f.external / "SIBLING.txt").read_text(encoding="utf-8"), "sibling\n")
+            _symlink_or_skip(self, f.external / "nothing-here", f.root / "dangling.txt")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.write_regular_atomically(f.root, f.root / "dangling.txt", b"leak\n")
+            self.assertFalse((f.external / "nothing-here").exists())
+
+    def test_write_failure_removes_temporary_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Fixture(d)
+            dst = f.root / "out.txt"
+            dst.write_bytes(b"old\n")
+            before = _listing(f.root)
+            with mock.patch.object(fs.os, "replace", side_effect=OSError(5, "injected rename failure")):
+                with self.assertRaises(OSError):
+                    fs.write_regular_atomically(f.root, dst, b"new\n")
+            self.assertEqual(_listing(f.root), before)
+
+    def test_mkdir_chain_rmdir_and_unlink(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Fixture(d)
+            created = fs.mkdir_chain(f.root, f.root / ".agents" / "skills" / "x")
+            self.assertEqual([p.relative_to(f.root).as_posix() for p in created],
+                             [".agents", ".agents/skills", ".agents/skills/x"])
+            self.assertEqual(fs.mkdir_chain(f.root, f.root / ".agents" / "skills"), [])
+            self.assertEqual(fs.mkdir_chain(f.root, f.root), [])
+            with self.assertRaises(fs.UnsafePathError):
+                fs.mkdir_chain(f.root, f.source / "a" / "SKILL.md" / "sub")  # a file in the chain
+            target = f.root / ".agents" / "skills" / "x" / "SKILL.md"
+            fs.write_regular_atomically(f.root, target, b"x\n")
+            self.assertFalse(fs.rmdir_if_empty(f.root, target.parent))
+            with self.assertRaises(fs.UnsafePathError):
+                fs.unlink_regular_nofollow(f.root, target, expect_sha256="0" * 64)
+            self.assertTrue(target.exists())
+            fs.unlink_regular_nofollow(f.root, target, expect_sha256=fs.sha256_bytes(b"x\n"))
+            self.assertFalse(target.exists())
+            self.assertTrue(fs.rmdir_if_empty(f.root, target.parent))
+            self.assertTrue(fs.rmdir_if_empty(f.root, target.parent))  # already gone
+            _symlink_or_skip(self, f.external / "SIBLING.txt", f.root / "link.txt")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.unlink_regular_nofollow(f.root, f.root / "link.txt")
+            self.assertTrue(os.path.islink(f.root / "link.txt"))
+
+    def test_read_and_replace_regular_nofollow(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Fixture(d)
+            self.assertEqual(fs.read_regular_nofollow(f.root, f.source / "a" / "SKILL.md"), b"alpha\n")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.read_regular_nofollow(f.root, f.root / "absent.txt")
+            _symlink_or_skip(self, f.external / "SIBLING.txt", f.root / "link.txt")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.read_regular_nofollow(f.root, f.root / "link.txt")
+            src = f.root / "moving.txt"
+            src.write_bytes(b"moved\n")
+            fs.replace_regular_nofollow(f.root, src, f.source / "a" / "SKILL.md")
+            self.assertFalse(src.exists())
+            self.assertEqual((f.source / "a" / "SKILL.md").read_bytes(), b"moved\n")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.replace_regular_nofollow(f.root, f.root / "link.txt", f.root / "elsewhere.txt")
 
 
 if __name__ == "__main__":
