@@ -50,6 +50,8 @@ templates/              Plans, matrices, and configuration examples
 scripts/                Bootstrap, sync, validation, and safe tool runner
 tests/                  Standard-library unit tests
 docs/                   Architecture, safety, harness, and methodology docs
+orgs/cupel/             Cupel verification organisation (optional layer; canonical cards, docs, schemas, adapters, tools)
+.claude/agents/cupel/   Byte-identical mirror of orgs/cupel/agents/ for Claude Code
 ```
 
 Never edit generated adapter copies directly. Edit `skills/<skill>/SKILL.md`, then run:
@@ -103,6 +105,18 @@ Copy `templates/project-config.example.json` to `.soc-dv/config.json` in the tar
 ```bash
 python scripts/run_tool.py --config ../my-dv-project/.soc-dv/config.json --tool lint
 ```
+
+## Cupel: agentic verification organisation (optional layer)
+
+`orgs/cupel/` adds an evidence-gated organisation of 28 agent cards (14 departments, 3 offices, 1 entry point) on top of the canonical skills, for Claude Code (`claude --agent cupel-case-marshal`), Codex and other `AGENTS.md` readers, and any chat surface through a portable prompt protocol. Its one law: a verdict is bounded above by registered evidence, never by how much has been reasoned or agreed; only the Challenge Chamber issues verdicts, and only from evidence records minted by the Evidence Vault at the pinned candidate. Read-only by default; file edits and tool execution need verbatim human sentences. See [orgs/cupel/README.md](orgs/cupel/README.md) and validate with:
+
+```bash
+python3 orgs/cupel/tools/check_parity.py
+python3 orgs/cupel/tools/validate_cupel.py
+python3 -m unittest discover -s orgs/cupel/tests -v
+```
+
+The stack's `scripts/validate.py` does not inspect `orgs/cupel/`; run both sets. Cupel narrows the safety model above and never relaxes it.
 
 ## License
 

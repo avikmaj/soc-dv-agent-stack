@@ -1,0 +1,125 @@
+{
+  "schema_version": "1.0",
+  "face": "cupel-testbench-works",
+  "case": "C-001",
+  "mode": "read-only",
+  "path": "verdict",
+  "claims_of_success": [
+    {
+      "word": "passed",
+      "source": "CUPEL-REQUEST.task",
+      "line": 1,
+      "quote": "all 412 tests passed"
+    },
+    {
+      "word": "closed",
+      "source": "CUPEL-REQUEST.task",
+      "line": 1,
+      "quote": "functional coverage is closed at 97 percent"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-001",
+      "claim_class": "Observed",
+      "statement": "axi_scoreboard.sv:212 reports unmatched write responses at end of test with `uvm_warning`, so a lost response does not fail the test.",
+      "severity": "high",
+      "rank": 3,
+      "evidence_refs": [
+        "none"
+      ],
+      "affected_files": [
+        "tb/axi_env/axi_scoreboard.sv"
+      ],
+      "affected_requirements": [
+        "REQ-AXI-ORD-003"
+      ]
+    },
+    {
+      "id": "F-002",
+      "claim_class": "Derived",
+      "statement": "Because F-001 downgrades a checker outcome to a warning, the 412/412 result in summary.txt is not a Checked result for REQ-AXI-ORD-003.",
+      "severity": "high",
+      "rank": 2,
+      "evidence_refs": [
+        "none"
+      ],
+      "affected_files": [
+        "logs/regress_2026-09-24/summary.txt"
+      ],
+      "affected_requirements": [
+        "REQ-AXI-ORD-003"
+      ]
+    },
+    {
+      "id": "F-003",
+      "claim_class": "Proposed",
+      "statement": "Change the end-of-test unmatched-response report to `uvm_error` and add a negative test that drops one B-channel response to show the checker fires.",
+      "severity": "medium",
+      "rank": 1,
+      "evidence_refs": [
+        "none"
+      ],
+      "affected_files": [
+        "tb/axi_env/axi_scoreboard.sv"
+      ],
+      "affected_requirements": [
+        "REQ-AXI-ORD-003"
+      ]
+    }
+  ],
+  "evidence_records": [],
+  "requirement_states": [
+    {
+      "requirement": "REQ-AXI-ORD-003",
+      "state": "Exercised",
+      "record": "none"
+    }
+  ],
+  "ledger_entries": [
+    {
+      "id": "C-001/DL-testbench-works-001",
+      "case": "C-001",
+      "raised_by": "cupel-testbench-works",
+      "class": "BLOCKING",
+      "status": "OPEN",
+      "statement": "tb/axi_env/axi_scoreboard.sv treats an unmatched write response at end of test as UVM_WARNING; the 412/412 result cannot distinguish a silent loss from a pass.",
+      "basis": {
+        "claim_class": "Observed",
+        "rank": 3
+      },
+      "discriminating_command": "grep -n 'uvm_warning\\|UVM_WARNING' tb/axi_env/axi_scoreboard.sv && python3 scripts/run_tool.py --config .soc-dv/config.json --tool sim",
+      "cleared_by": null,
+      "accepted_by": null,
+      "raised_at": "2026-09-25T06:10:00Z",
+      "verbatim": true
+    }
+  ],
+  "ceiling_suggestion": {
+    "value": "NOT READY",
+    "reasons": [
+      "OPEN BLOCKING entry C-001/DL-testbench-works-001",
+      "no CURRENT record supports the Checked state of REQ-AXI-ORD-003"
+    ]
+  },
+  "verdict": "NONE",
+  "ceiling_computation": "NONE",
+  "human_decisions": [
+    "Confirm whether REQ-AXI-ORD-003 is P0 or P1 in the closure contract"
+  ],
+  "validation_performed": [
+    "none"
+  ],
+  "next_commands": [
+    "python3 scripts/run_tool.py --config .soc-dv/config.json --tool sim --dry-run"
+  ],
+  "residual_gaps": [
+    "The VIP commit is pinned by short SHA only; the Registry should confirm the full SHA before the Vault rules on currency"
+  ],
+  "ledger_control": {
+    "received": [],
+    "returned_unchanged": true,
+    "defects_recorded": []
+  },
+  "chamber_pass": "NONE"
+}

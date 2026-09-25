@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/avikmaj/soc-dv-agent-stack/orgs/cupel/schemas/evidence-record.schema.json",
+  "title": "Cupel Evidence Record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "area",
+    "status",
+    "rank",
+    "minted_by",
+    "provenance",
+    "missing_fields",
+    "supports_claims"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^C-[0-9]+/EV-[a-z]+-[0-9]+$"
+    },
+    "area": {
+      "enum": [
+        "compile",
+        "elaborate",
+        "sim",
+        "regression",
+        "assertion",
+        "formal",
+        "coverage",
+        "lint",
+        "synth",
+        "cdc",
+        "rdc",
+        "reset",
+        "upf",
+        "perf",
+        "security",
+        "parity",
+        "other"
+      ]
+    },
+    "status": {
+      "enum": [
+        "CURRENT",
+        "STALE",
+        "UNVERIFIED-RECORD"
+      ]
+    },
+    "rank": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 6
+    },
+    "minted_by": {
+      "const": "cupel-evidence-vault"
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "revision",
+        "config_hash",
+        "tool",
+        "tool_version",
+        "argv",
+        "run_id",
+        "started_at",
+        "finished_at",
+        "report_path",
+        "owner",
+        "reproduced"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "config_hash": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argv": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "started_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "finished_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "report_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reproduced": {
+          "enum": [
+            "this-session",
+            "ci-immutable",
+            "report-only",
+            "MISSING"
+          ]
+        }
+      }
+    },
+    "missing_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "supports_claims": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "conflicting_with": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^C-[0-9]+/EV-[a-z]+-[0-9]+$"
+      }
+    },
+    "currency_basis": {
+      "type": "string"
+    }
+  }
+}

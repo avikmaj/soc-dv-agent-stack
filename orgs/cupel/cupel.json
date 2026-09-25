@@ -1,0 +1,164 @@
+{
+  "organization_id": "cupel",
+  "organization_name": "Cupel",
+  "expansion": "Confidence Under Proof Engineering Layer",
+  "version": "0.2.0",
+  "schema_version": "1.0",
+  "created_date": "2026-09-25",
+  "core_path": "orgs/cupel",
+  "law_path": "orgs/cupel/docs/law.md",
+  "card_paths": {
+    "canonical": "orgs/cupel/agents",
+    "mirrors": [
+      ".claude/agents/cupel"
+    ]
+  },
+  "card_limits": {
+    "description_max_chars": 200,
+    "body_min_chars": 1800,
+    "body_max_chars": 9000,
+    "frontmatter_keys": [
+      "name",
+      "description",
+      "tools"
+    ]
+  },
+  "supported_adapter_versions": {
+    "claude-code": "0.2.0",
+    "claude-project": "0.2.0",
+    "codex-agents-md": "0.2.0",
+    "portable-prompt-protocol": "0.2.0"
+  },
+  "face_classes": {
+    "review": "Read, Grep, Glob",
+    "drafting": "Read, Grep, Glob, Edit, Write",
+    "runner": "Read, Grep, Glob, Bash",
+    "office": "Read, Grep, Glob",
+    "steward": "Read, Grep, Glob, Bash",
+    "marshal": "Agent"
+  },
+  "departments": [
+    "charter-bench",
+    "design-reading-room",
+    "interconnect-rulebook",
+    "testbench-works",
+    "comparator-desk",
+    "proof-bench",
+    "coverage-desk",
+    "regression-yard",
+    "divergence-lab",
+    "system-assembly-floor",
+    "domain-crossing-desk",
+    "load-bench",
+    "threat-desk",
+    "challenge-chamber"
+  ],
+  "offices": [
+    "intake-registry",
+    "evidence-vault",
+    "stack-stewardship"
+  ],
+  "entry_point": "case-marshal",
+  "faces": [
+    {"face": "case-marshal", "class": "marshal", "unit": null},
+    {"face": "intake-registry", "class": "office", "unit": "intake-registry"},
+    {"face": "evidence-vault", "class": "office", "unit": "evidence-vault"},
+    {"face": "stack-stewardship", "class": "steward", "unit": "stack-stewardship"},
+    {"face": "challenge-chamber", "class": "review", "unit": "challenge-chamber"},
+    {"face": "charter-bench", "class": "review", "unit": "charter-bench"},
+    {"face": "charter-bench-drafting", "class": "drafting", "unit": "charter-bench"},
+    {"face": "design-reading-room", "class": "review", "unit": "design-reading-room"},
+    {"face": "design-reading-room-drafting", "class": "drafting", "unit": "design-reading-room"},
+    {"face": "interconnect-rulebook", "class": "review", "unit": "interconnect-rulebook"},
+    {"face": "interconnect-rulebook-drafting", "class": "drafting", "unit": "interconnect-rulebook"},
+    {"face": "testbench-works", "class": "review", "unit": "testbench-works"},
+    {"face": "testbench-works-drafting", "class": "drafting", "unit": "testbench-works"},
+    {"face": "comparator-desk", "class": "review", "unit": "comparator-desk"},
+    {"face": "comparator-desk-drafting", "class": "drafting", "unit": "comparator-desk"},
+    {"face": "proof-bench", "class": "review", "unit": "proof-bench"},
+    {"face": "proof-bench-drafting", "class": "drafting", "unit": "proof-bench"},
+    {"face": "coverage-desk", "class": "review", "unit": "coverage-desk"},
+    {"face": "coverage-desk-drafting", "class": "drafting", "unit": "coverage-desk"},
+    {"face": "regression-yard", "class": "review", "unit": "regression-yard"},
+    {"face": "regression-yard-runner", "class": "runner", "unit": "regression-yard"},
+    {"face": "divergence-lab", "class": "review", "unit": "divergence-lab"},
+    {"face": "system-assembly-floor", "class": "review", "unit": "system-assembly-floor"},
+    {"face": "system-assembly-floor-drafting", "class": "drafting", "unit": "system-assembly-floor"},
+    {"face": "domain-crossing-desk", "class": "review", "unit": "domain-crossing-desk"},
+    {"face": "load-bench", "class": "review", "unit": "load-bench"},
+    {"face": "load-bench-drafting", "class": "drafting", "unit": "load-bench"},
+    {"face": "threat-desk", "class": "review", "unit": "threat-desk"}
+  ],
+  "chamber_stations": [
+    "claim-challenger",
+    "ledger-reconciler",
+    "ceiling-setter"
+  ],
+  "claim_classes": [
+    "Observed",
+    "Derived",
+    "Assumed",
+    "Unverified",
+    "Proposed"
+  ],
+  "verdicts": [
+    "PASS",
+    "CONDITIONAL",
+    "NOT READY"
+  ],
+  "requirement_states": [
+    "none",
+    "Exercised",
+    "Checked",
+    "Qualified"
+  ],
+  "evidence_areas": [
+    "compile",
+    "elaborate",
+    "sim",
+    "regression",
+    "assertion",
+    "formal",
+    "coverage",
+    "lint",
+    "synth",
+    "cdc",
+    "rdc",
+    "reset",
+    "upf",
+    "perf",
+    "security",
+    "parity",
+    "other"
+  ],
+  "identifier_patterns": {
+    "case": "^C-[0-9]+$",
+    "evidence_record": "^C-[0-9]+/EV-[a-z]+-[0-9]+$",
+    "dissent_entry": "^C-[0-9]+/DL-[a-z][a-z-]*[a-z]-[0-9]{3}$",
+    "chamber_pass": "^C-[0-9]+/CP-[0-9]+$"
+  },
+  "tripwire_words": [
+    "pass",
+    "passed",
+    "proven",
+    "closed",
+    "covered",
+    "compliant",
+    "clean",
+    "signoff",
+    "ready",
+    "verified",
+    "success",
+    "closure",
+    "complete",
+    "green"
+  ],
+  "approval_sentences": {
+    "elevation": "Elevate Cupel/<dept> to implementation for <path-glob>; I approve file edits under that path.",
+    "execution": "Run Cupel/regression-yard-runner: <config-path> tool <entry>; I approve this single execution."
+  },
+  "marshal_sentinels": {
+    "chamber_not_run": "chamber_pass: Chamber not run",
+    "review_path_header": "not adjudicated; no verdict"
+  }
+}

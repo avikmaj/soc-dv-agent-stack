@@ -1,0 +1,165 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/avikmaj/soc-dv-agent-stack/orgs/cupel/schemas/case-request.schema.json",
+  "title": "Cupel Case Request (CUPEL-REQUEST)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "organization",
+    "deliverable",
+    "requested_by",
+    "platform",
+    "candidate",
+    "targets",
+    "evidence_supplied",
+    "departments",
+    "elevation",
+    "approved_commands",
+    "task"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "organization": {
+      "const": "Cupel"
+    },
+    "deliverable": {
+      "enum": [
+        "review",
+        "verdict"
+      ]
+    },
+    "requested_by": {
+      "type": "string",
+      "minLength": 1
+    },
+    "platform": {
+      "enum": [
+        "claude-code",
+        "claude-project",
+        "codex",
+        "chatgpt-project",
+        "generic"
+      ]
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "PINNED",
+            "UNPINNED"
+          ]
+        },
+        "commits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "repo",
+              "commit"
+            ],
+            "properties": {
+              "repo": {
+                "type": "string",
+                "minLength": 1
+              },
+              "commit": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{7,40}$"
+              }
+            }
+          }
+        },
+        "config_hash": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "evidence_supplied": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "value"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "path",
+              "run_id",
+              "pasted"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "departments": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "auto",
+          "charter-bench",
+          "design-reading-room",
+          "interconnect-rulebook",
+          "testbench-works",
+          "comparator-desk",
+          "proof-bench",
+          "coverage-desk",
+          "regression-yard",
+          "divergence-lab",
+          "system-assembly-floor",
+          "domain-crossing-desk",
+          "load-bench",
+          "threat-desk",
+          "challenge-chamber"
+        ]
+      },
+      "minItems": 1
+    },
+    "elevation": {
+      "type": "string",
+      "pattern": "^(none|Elevate Cupel/[a-z][a-z-]*[a-z] to implementation for .+; I approve file edits under that path\\.)$"
+    },
+    "approved_commands": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^Run Cupel/regression-yard-runner: .+ tool [A-Za-z0-9_.-]+; I approve this single execution\\.$"
+      }
+    },
+    "task": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

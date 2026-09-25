@@ -19,3 +19,7 @@ Schemas normalize verification plans, traceability records, regression results, 
 ## Portability
 
 Claude Code and Codex adapters contain identical skill content. Harness-specific orchestration remains thin so methodology does not diverge. Future harnesses must be generated from the same canonical source.
+
+## Organisation layer (Cupel, optional)
+
+`orgs/cupel/` is a second hand-edited layer above the skills: an evidence-gated verification organisation whose 28 agent cards consume the canonical skills as method and add routing, independent challenge, evidence records, and verdict rules (`orgs/cupel/docs/law.md`). Its cards are canonical under `orgs/cupel/agents/` and mirrored byte-for-byte to `.claude/agents/cupel/` by `orgs/cupel/tools/check_parity.py --sync`; `orgs/cupel/tools/validate_cupel.py` checks the layer's internal consistency. The layer sits below `AGENTS.md` and `CLAUDE.md` in authority and cannot relax them. `scripts/validate.py` and `scripts/sync_adapters.py` do not inspect it; its checks run separately (CI integration is deferred).

@@ -1,0 +1,32 @@
+{
+  "id": "C-001/EV-regression-1",
+  "area": "regression",
+  "status": "STALE",
+  "rank": 4,
+  "minted_by": "cupel-evidence-vault",
+  "provenance": {
+    "source": "retained report logs/regress_2026-09-24/summary.txt",
+    "revision": "example-soc@9f2c1a7d3b6e4f0a1c2d3e4f5a6b7c8d9e0f1a2b; axi-vip@unknown",
+    "config_hash": "sha256:3e1f8c2a9b7d6e5f4c3b2a1908f7e6d5c4b3a291807f6e5d4c3b2a19087f6e5d",
+    "tool": "vcs",
+    "tool_version": "MISSING",
+    "argv": [
+      "make",
+      "-C",
+      "sim",
+      "regress",
+      "NIGHTLY=1"
+    ],
+    "run_id": "ci-run-88213",
+    "started_at": "2026-09-24T21:02:11Z",
+    "finished_at": "2026-09-25T01:48:39Z",
+    "report_path": "logs/regress_2026-09-24/summary.txt",
+    "owner": "dv-lead",
+    "reproduced": "report-only"
+  },
+  "missing_fields": [],
+  "supports_claims": [
+    "412 of 412 tests report status pass in summary.txt"
+  ],
+  "currency_basis": "axi-vip commit in the report header (4b1e9c0d) cannot be shown equal to the pinned VIP commit's full SHA; tool_version absent from the report; STALE until rerun at the pinned candidate"
+}
