@@ -1,0 +1,171 @@
+{
+  "schema_version": "1.0",
+  "case": "C-001",
+  "path": "verdict",
+  "mode": "read-only",
+  "platform": "claude-code",
+  "candidate": {
+    "status": "PINNED",
+    "commits": [
+      {
+        "repo": "example-soc",
+        "commit": "9f2c1a7d3b6e4f0a1c2d3e4f5a6b7c8d9e0f1a2b"
+      },
+      {
+        "repo": "axi-vip",
+        "commit": "4b1e9c0d"
+      }
+    ],
+    "config_hash": "sha256:3e1f8c2a9b7d6e5f4c3b2a1908f7e6d5c4b3a291807f6e5d4c3b2a19087f6e5d",
+    "tag": "regress-2026-09-24-nightly"
+  },
+  "header": "adjudicated by the Challenge Chamber",
+  "faces_dispatched": [
+    "cupel-intake-registry",
+    "cupel-charter-bench",
+    "cupel-testbench-works",
+    "cupel-comparator-desk",
+    "cupel-coverage-desk",
+    "cupel-evidence-vault",
+    "cupel-challenge-chamber"
+  ],
+  "findings": [
+    {
+      "id": "F-001",
+      "claim_class": "Observed",
+      "statement": "axi_scoreboard.sv:212 reports unmatched write responses at end of test with `uvm_warning`, so a lost response does not fail the test.",
+      "severity": "high",
+      "rank": 3,
+      "evidence_refs": [
+        "none"
+      ],
+      "affected_files": [
+        "tb/axi_env/axi_scoreboard.sv"
+      ],
+      "affected_requirements": [
+        "REQ-AXI-ORD-003"
+      ]
+    },
+    {
+      "id": "F-002",
+      "claim_class": "Derived",
+      "statement": "Because F-001 downgrades a checker outcome to a warning, the 412/412 result in summary.txt is not a Checked result for REQ-AXI-ORD-003.",
+      "severity": "high",
+      "rank": 2,
+      "evidence_refs": [
+        "none"
+      ],
+      "affected_files": [
+        "logs/regress_2026-09-24/summary.txt"
+      ],
+      "affected_requirements": [
+        "REQ-AXI-ORD-003"
+      ]
+    },
+    {
+      "id": "F-003",
+      "claim_class": "Proposed",
+      "statement": "Change the end-of-test unmatched-response report to `uvm_error` and add a negative test that drops one B-channel response to show the checker fires.",
+      "severity": "medium",
+      "rank": 1,
+      "evidence_refs": [
+        "none"
+      ],
+      "affected_files": [
+        "tb/axi_env/axi_scoreboard.sv"
+      ],
+      "affected_requirements": [
+        "REQ-AXI-ORD-003"
+      ]
+    }
+  ],
+  "evidence_records": [
+    {
+      "id": "C-001/EV-regression-1",
+      "area": "regression",
+      "status": "STALE",
+      "rank": 4,
+      "minted_by": "cupel-evidence-vault",
+      "provenance": {
+        "source": "retained report logs/regress_2026-09-24/summary.txt",
+        "revision": "example-soc@9f2c1a7d3b6e4f0a1c2d3e4f5a6b7c8d9e0f1a2b; axi-vip@unknown",
+        "config_hash": "sha256:3e1f8c2a9b7d6e5f4c3b2a1908f7e6d5c4b3a291807f6e5d4c3b2a19087f6e5d",
+        "tool": "vcs",
+        "tool_version": "MISSING",
+        "argv": [
+          "make",
+          "-C",
+          "sim",
+          "regress",
+          "NIGHTLY=1"
+        ],
+        "run_id": "ci-run-88213",
+        "started_at": "2026-09-24T21:02:11Z",
+        "finished_at": "2026-09-25T01:48:39Z",
+        "report_path": "logs/regress_2026-09-24/summary.txt",
+        "owner": "dv-lead",
+        "reproduced": "report-only"
+      },
+      "missing_fields": [],
+      "supports_claims": [
+        "412 of 412 tests report status pass in summary.txt"
+      ],
+      "currency_basis": "axi-vip commit in the report header (4b1e9c0d) cannot be shown equal to the pinned VIP commit's full SHA; tool_version absent from the report; STALE until rerun at the pinned candidate"
+    }
+  ],
+  "requirement_states": [
+    {
+      "requirement": "REQ-AXI-ORD-003",
+      "state": "Exercised",
+      "record": "none"
+    }
+  ],
+  "dissent_ledger": [
+    {
+      "id": "C-001/DL-testbench-works-001",
+      "case": "C-001",
+      "raised_by": "cupel-testbench-works",
+      "class": "BLOCKING",
+      "status": "OPEN",
+      "statement": "tb/axi_env/axi_scoreboard.sv treats an unmatched write response at end of test as UVM_WARNING; the 412/412 result cannot distinguish a silent loss from a pass.",
+      "basis": {
+        "claim_class": "Observed",
+        "rank": 3
+      },
+      "discriminating_command": "grep -n 'uvm_warning\\|UVM_WARNING' tb/axi_env/axi_scoreboard.sv && python3 scripts/run_tool.py --config .soc-dv/config.json --tool sim",
+      "cleared_by": null,
+      "accepted_by": null,
+      "raised_at": "2026-09-25T06:10:00Z",
+      "verbatim": true
+    }
+  ],
+  "verdict": "NOT READY",
+  "chamber_pass": "C-001/CP-1",
+  "ceiling_computation": [
+    "candidate PINNED: rule 1 does not fire",
+    "admissible records: C-001/EV-regression-1 is STALE and report-only; no CURRENT record exists: rule 2 fires -> NOT READY",
+    "OPEN BLOCKING entries: C-001/DL-testbench-works-001: rule 4 would also fire",
+    "ceiling = NOT READY (absence of evidence at the pinned candidate, not a judgment of the design)"
+  ],
+  "human_decisions": [
+    "Supply the full axi-vip commit SHA and the simulator version, or approve a rerun of the regression entry at the pinned candidate"
+  ],
+  "validation_performed": [
+    "none"
+  ],
+  "validation_not_performed": [
+    "regression rerun at the pinned candidate",
+    "coverage merge provenance check"
+  ],
+  "next_commands": [
+    "Run Cupel/regression-yard-runner: .soc-dv/config.json tool sim; I approve this single execution."
+  ],
+  "residual_gaps": [
+    "coverage report cov/merged_2026-09-24.ucdb.report.txt not bound to a configuration hash"
+  ],
+  "closing": {
+    "status": "NOT READY (C-001/CP-1)",
+    "evidence": "1 STALE report-only record; 0 CURRENT; 1 OPEN BLOCKING dissent",
+    "next": "pin the VIP SHA and approve one regression rerun"
+  }
+}

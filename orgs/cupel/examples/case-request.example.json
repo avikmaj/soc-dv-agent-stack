@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "organization": "Cupel",
+  "deliverable": "verdict",
+  "requested_by": "dv-lead",
+  "platform": "claude-code",
+  "candidate": {
+    "status": "PINNED",
+    "commits": [
+      {
+        "repo": "example-soc",
+        "commit": "9f2c1a7d3b6e4f0a1c2d3e4f5a6b7c8d9e0f1a2b"
+      },
+      {
+        "repo": "axi-vip",
+        "commit": "4b1e9c0d"
+      }
+    ],
+    "config_hash": "sha256:3e1f8c2a9b7d6e5f4c3b2a1908f7e6d5c4b3a291807f6e5d4c3b2a19087f6e5d",
+    "tag": "regress-2026-09-24-nightly"
+  },
+  "targets": [
+    "tb/axi_env/",
+    "rtl/axi_bridge/",
+    "logs/regress_2026-09-24/"
+  ],
+  "evidence_supplied": [
+    {
+      "kind": "path",
+      "value": "logs/regress_2026-09-24/summary.txt"
+    },
+    {
+      "kind": "run_id",
+      "value": "ci-run-88213"
+    },
+    {
+      "kind": "path",
+      "value": "cov/merged_2026-09-24.ucdb.report.txt"
+    }
+  ],
+  "departments": [
+    "auto"
+  ],
+  "elevation": "none",
+  "approved_commands": [
+    "Run Cupel/regression-yard-runner: .soc-dv/config.json tool lint; I approve this single execution."
+  ],
+  "task": "The nightly regression report says all 412 tests passed and functional coverage is closed at 97 percent. Give a verdict on this candidate."
+}

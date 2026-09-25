@@ -1,0 +1,17 @@
+{
+  "id": "C-001/DL-testbench-works-001",
+  "case": "C-001",
+  "raised_by": "cupel-testbench-works",
+  "class": "BLOCKING",
+  "status": "OPEN",
+  "statement": "tb/axi_env/axi_scoreboard.sv treats an unmatched write response at end of test as UVM_WARNING; the 412/412 result cannot distinguish a silent loss from a pass.",
+  "basis": {
+    "claim_class": "Observed",
+    "rank": 3
+  },
+  "discriminating_command": "grep -n 'uvm_warning\\|UVM_WARNING' tb/axi_env/axi_scoreboard.sv && python3 scripts/run_tool.py --config .soc-dv/config.json --tool sim",
+  "cleared_by": null,
+  "accepted_by": null,
+  "raised_at": "2026-09-25T06:10:00Z",
+  "verbatim": true
+}

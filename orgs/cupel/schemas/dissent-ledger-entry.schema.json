@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/avikmaj/soc-dv-agent-stack/orgs/cupel/schemas/dissent-ledger-entry.schema.json",
+  "title": "Cupel Dissent Ledger Entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "case",
+    "raised_by",
+    "class",
+    "status",
+    "statement",
+    "basis",
+    "discriminating_command",
+    "cleared_by",
+    "accepted_by",
+    "verbatim"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^C-[0-9]+/DL-[a-z][a-z-]*[a-z]-[0-9]{3}$"
+    },
+    "case": {
+      "type": "string",
+      "pattern": "^C-[0-9]+$"
+    },
+    "raised_by": {
+      "type": "string",
+      "pattern": "^cupel-[a-z][a-z-]*[a-z]$"
+    },
+    "class": {
+      "enum": [
+        "BLOCKING",
+        "ADVISORY"
+      ]
+    },
+    "status": {
+      "enum": [
+        "OPEN",
+        "CLEARED",
+        "ACCEPTED"
+      ]
+    },
+    "statement": {
+      "type": "string",
+      "minLength": 1
+    },
+    "basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_class",
+        "rank"
+      ],
+      "properties": {
+        "claim_class": {
+          "enum": [
+            "Observed",
+            "Derived",
+            "Assumed",
+            "Unverified",
+            "Proposed"
+          ]
+        },
+        "rank": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        }
+      }
+    },
+    "discriminating_command": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cleared_by": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^C-[0-9]+/EV-[a-z]+-[0-9]+$"
+    },
+    "accepted_by": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "raised_at": {
+      "type": "string"
+    },
+    "defect_of": {
+      "type": "string"
+    },
+    "verbatim": {
+      "const": true
+    }
+  }
+}

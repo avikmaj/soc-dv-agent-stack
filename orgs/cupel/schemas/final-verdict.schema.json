@@ -1,0 +1,563 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/avikmaj/soc-dv-agent-stack/orgs/cupel/schemas/final-verdict.schema.json",
+  "title": "Cupel Final Deliverable (composed by the Case Marshal)",
+  "$defs": {
+    "evidence_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "area",
+        "status",
+        "rank",
+        "minted_by",
+        "provenance",
+        "missing_fields",
+        "supports_claims"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^C-[0-9]+/EV-[a-z]+-[0-9]+$"
+        },
+        "area": {
+          "enum": [
+            "compile",
+            "elaborate",
+            "sim",
+            "regression",
+            "assertion",
+            "formal",
+            "coverage",
+            "lint",
+            "synth",
+            "cdc",
+            "rdc",
+            "reset",
+            "upf",
+            "perf",
+            "security",
+            "parity",
+            "other"
+          ]
+        },
+        "status": {
+          "enum": [
+            "CURRENT",
+            "STALE",
+            "UNVERIFIED-RECORD"
+          ]
+        },
+        "rank": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6
+        },
+        "minted_by": {
+          "const": "cupel-evidence-vault"
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source",
+            "revision",
+            "config_hash",
+            "tool",
+            "tool_version",
+            "argv",
+            "run_id",
+            "started_at",
+            "finished_at",
+            "report_path",
+            "owner",
+            "reproduced"
+          ],
+          "properties": {
+            "source": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "config_hash": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tool": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tool_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "argv": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            },
+            "run_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "started_at": {
+              "type": "string",
+              "minLength": 1
+            },
+            "finished_at": {
+              "type": "string",
+              "minLength": 1
+            },
+            "report_path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "owner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reproduced": {
+              "enum": [
+                "this-session",
+                "ci-immutable",
+                "report-only",
+                "MISSING"
+              ]
+            }
+          }
+        },
+        "missing_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "supports_claims": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "conflicting_with": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^C-[0-9]+/EV-[a-z]+-[0-9]+$"
+          }
+        },
+        "currency_basis": {
+          "type": "string"
+        }
+      }
+    },
+    "dissent_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "case",
+        "raised_by",
+        "class",
+        "status",
+        "statement",
+        "basis",
+        "discriminating_command",
+        "cleared_by",
+        "accepted_by",
+        "verbatim"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^C-[0-9]+/DL-[a-z][a-z-]*[a-z]-[0-9]{3}$"
+        },
+        "case": {
+          "type": "string",
+          "pattern": "^C-[0-9]+$"
+        },
+        "raised_by": {
+          "type": "string",
+          "pattern": "^cupel-[a-z][a-z-]*[a-z]$"
+        },
+        "class": {
+          "enum": [
+            "BLOCKING",
+            "ADVISORY"
+          ]
+        },
+        "status": {
+          "enum": [
+            "OPEN",
+            "CLEARED",
+            "ACCEPTED"
+          ]
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "basis": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "claim_class",
+            "rank"
+          ],
+          "properties": {
+            "claim_class": {
+              "enum": [
+                "Observed",
+                "Derived",
+                "Assumed",
+                "Unverified",
+                "Proposed"
+              ]
+            },
+            "rank": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            }
+          }
+        },
+        "discriminating_command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cleared_by": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^C-[0-9]+/EV-[a-z]+-[0-9]+$"
+        },
+        "accepted_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "raised_at": {
+          "type": "string"
+        },
+        "defect_of": {
+          "type": "string"
+        },
+        "verbatim": {
+          "const": true
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "claim_class",
+        "statement",
+        "severity",
+        "rank",
+        "evidence_refs",
+        "affected_files",
+        "affected_requirements"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^F-[0-9]{3}$"
+        },
+        "claim_class": {
+          "enum": [
+            "Observed",
+            "Derived",
+            "Assumed",
+            "Unverified",
+            "Proposed"
+          ]
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": [
+            "high",
+            "medium",
+            "low",
+            "info"
+          ]
+        },
+        "rank": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(none|C-[0-9]+/EV-[a-z]+-[0-9]+)$"
+          }
+        },
+        "affected_files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "affected_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case",
+    "path",
+    "mode",
+    "platform",
+    "candidate",
+    "header",
+    "faces_dispatched",
+    "findings",
+    "evidence_records",
+    "requirement_states",
+    "dissent_ledger",
+    "chamber_pass",
+    "ceiling_computation",
+    "human_decisions",
+    "validation_performed",
+    "validation_not_performed",
+    "next_commands",
+    "residual_gaps",
+    "closing"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "case": {
+      "type": "string",
+      "pattern": "^C-[0-9]+$"
+    },
+    "path": {
+      "enum": [
+        "review",
+        "verdict"
+      ]
+    },
+    "mode": {
+      "enum": [
+        "read-only",
+        "planning",
+        "implementation",
+        "validation",
+        "challenge"
+      ]
+    },
+    "platform": {
+      "enum": [
+        "claude-code",
+        "claude-project",
+        "codex",
+        "chatgpt-project",
+        "generic"
+      ]
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "PINNED",
+            "UNPINNED"
+          ]
+        },
+        "commits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "repo",
+              "commit"
+            ],
+            "properties": {
+              "repo": {
+                "type": "string",
+                "minLength": 1
+              },
+              "commit": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{7,40}$"
+              }
+            }
+          }
+        },
+        "config_hash": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "header": {
+      "enum": [
+        "not adjudicated; no verdict",
+        "adjudicated by the Challenge Chamber"
+      ]
+    },
+    "faces_dispatched": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^cupel-[a-z][a-z-]*[a-z]$"
+      },
+      "minItems": 1
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "evidence_records": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidence_record"
+      }
+    },
+    "requirement_states": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requirement",
+          "state",
+          "record"
+        ],
+        "properties": {
+          "requirement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "state": {
+            "enum": [
+              "none",
+              "Exercised",
+              "Checked",
+              "Qualified"
+            ]
+          },
+          "record": {
+            "type": "string",
+            "pattern": "^(none|C-[0-9]+/EV-[a-z]+-[0-9]+)$"
+          }
+        }
+      }
+    },
+    "dissent_ledger": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/dissent_entry"
+      }
+    },
+    "verdict": {
+      "enum": [
+        "PASS",
+        "CONDITIONAL",
+        "NOT READY"
+      ]
+    },
+    "chamber_pass": {
+      "type": "string",
+      "pattern": "^(Chamber not run|NONE \\(ceiling-setter not run\\)|C-[0-9]+/CP-[0-9]+)$"
+    },
+    "ceiling_computation": {
+      "type": [
+        "string",
+        "array"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "human_decisions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "validation_performed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "validation_not_performed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "next_commands": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "residual_gaps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "closing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "evidence",
+        "next"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "next": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
