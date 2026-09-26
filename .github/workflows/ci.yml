@@ -29,8 +29,6 @@ jobs:
         include:
           - os: ubuntu-latest
             python: '3.11'
-    env:
-      CI_EVIDENCE_DIR: ${{ runner.temp }}/ci-evidence
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -53,6 +51,8 @@ jobs:
           MATRIX_OS: ${{ matrix.os }}
           MATRIX_PYTHON: ${{ matrix.python }}
         run: |
+          CI_EVIDENCE_DIR="$RUNNER_TEMP/ci-evidence"
+          echo "CI_EVIDENCE_DIR=$CI_EVIDENCE_DIR" >> "$GITHUB_ENV"
           mkdir -p "$CI_EVIDENCE_DIR"
           {
             echo "workflow_run: $GITHUB_RUN_ID attempt $GITHUB_RUN_ATTEMPT job $GITHUB_JOB"
@@ -112,8 +112,6 @@ jobs:
     name: crlf-checkout (windows-latest, py3.12, core.autocrlf=true)
     runs-on: windows-latest
     timeout-minutes: 15
-    env:
-      CI_EVIDENCE_DIR: ${{ runner.temp }}/ci-evidence
     steps:
       - name: Set core.autocrlf=true before checkout
         shell: bash
@@ -138,6 +136,8 @@ jobs:
         env:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          CI_EVIDENCE_DIR="$RUNNER_TEMP/ci-evidence"
+          echo "CI_EVIDENCE_DIR=$CI_EVIDENCE_DIR" >> "$GITHUB_ENV"
           mkdir -p "$CI_EVIDENCE_DIR"
           {
             echo "workflow_run: $GITHUB_RUN_ID attempt $GITHUB_RUN_ATTEMPT job $GITHUB_JOB"
