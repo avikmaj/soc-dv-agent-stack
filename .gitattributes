@@ -1,4 +1,4 @@
-﻿# Keep source-controlled content byte-stable across Windows, Linux, and macOS.
+# Keep source-controlled content byte-stable across Windows, Linux, and macOS.
 * text=auto
 
 *.py   text eol=lf
