@@ -1,0 +1,19 @@
+# Dependabot policy for this repository (audit finding F16).
+#
+# - Every `uses:` in .github/workflows/ is pinned to a full commit SHA, never to a mutable tag or branch. This file is
+#   what keeps those SHAs current: Dependabot opens a pull request when an action publishes a new release, and a SHA
+#   changes only by reviewing and merging such a pull request. No SHA is guessed or hand-edited.
+# - The "Node.js 20 actions are deprecated" runtime warning printed for the current actions/checkout and
+#   actions/setup-python pins is resolved the same way: accept Dependabot's pin-update pull requests for those
+#   actions. Nothing in this repository guesses a replacement SHA.
+# - No `pip` ecosystem entry: the project has no runtime or development dependencies (standard library only), so
+#   there is nothing for Dependabot to track there.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci

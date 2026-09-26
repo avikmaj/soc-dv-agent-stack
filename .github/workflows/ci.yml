@@ -1,103 +1,197 @@
 name: CI
+# Audit finding F16 (CI hardening) and the CI part of F17 (portability). The full unittest suite runs on an OS x
+# Python matrix, every skip is gated by tests/ci_skip_policy.py (unit-tested in tests/test_ci_skip_policy.py; this
+# workflow embeds no gating logic), and a second Windows job checks out with core.autocrlf=true to prove that
+# .gitattributes keeps working copies LF. docs/ci.md states what a green run does and does not prove.
+#
+# Action pins are full commit SHAs, kept current by Dependabot (.github/dependabot.yml). No SHA is edited by hand and
+# none was guessed. The "Node.js 20 actions are deprecated" runtime warning printed for the current actions/checkout
+# and actions/setup-python pins is resolved by reviewing and merging Dependabot's pin-update pull requests.
 on:
   push:
     branches: [main]
   pull_request:
 permissions:
   contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    name: validate (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.10', '3.12']
+        include:
+          - os: ubuntu-latest
+            python: '3.11'
+    env:
+      CI_EVIDENCE_DIR: ${{ runner.temp }}/ci-evidence
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
-          python-version: '3.12'
-      - run: python scripts/validate.py
-      - run: python -m unittest discover -s tests -v
-  f1-windows-junction-validation:
-    # Audit finding F1: the two junction/reparse-point tests are skipped on POSIX hosts and can only be
-    # exercised on Windows. A skip here is treated as a failure so an unavailable junction capability
-    # can never appear green.
+          python-version: ${{ matrix.python }}
+      - name: Confine TEMP and TMP to the runner temporary directory (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tmp = Join-Path $env:RUNNER_TEMP 'ci-tmp'
+          New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+          "TEMP=$tmp" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "TMP=$tmp" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Prepare the evidence directory and record the run
+        shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MATRIX_OS: ${{ matrix.os }}
+          MATRIX_PYTHON: ${{ matrix.python }}
+        run: |
+          mkdir -p "$CI_EVIDENCE_DIR"
+          {
+            echo "workflow_run: $GITHUB_RUN_ID attempt $GITHUB_RUN_ATTEMPT job $GITHUB_JOB"
+            echo "matrix: os=$MATRIX_OS python=$MATRIX_PYTHON runner_os=$RUNNER_OS"
+            echo "github_sha (merge commit on pull_request events): $GITHUB_SHA"
+            echo "pr_head_sha: ${PR_HEAD_SHA:-n/a}"
+            echo "git_rev_parse_HEAD: $(git rev-parse HEAD)"
+            echo "core.autocrlf: $(git config --get core.autocrlf || echo unset)"
+            echo "core.eol: $(git config --get core.eol || echo unset)"
+            echo "python: $(python --version 2>&1)"
+          } | tee "$CI_EVIDENCE_DIR/run-info.txt"
+      - name: Validate the repository
+        shell: bash
+        run: python scripts/validate.py
+      - name: Schema self-check
+        shell: bash
+        run: python scripts/schema_check.py --self-check
+      - name: Validate the templates against the schemas
+        shell: bash
+        run: python scripts/schema_check.py --templates
+      - name: Adapter parity
+        shell: bash
+        run: python scripts/sync_adapters.py --check
+      - name: Capability probe (evidence only; never fails)
+        shell: bash
+        run: python tests/ci_skip_policy.py --probe | tee "$CI_EVIDENCE_DIR/capability-probe.txt"
+      - name: Run the full unittest suite (output captured, exit status preserved)
+        shell: bash
+        run: |
+          rc=0
+          python -m unittest discover -s tests -v > "$CI_EVIDENCE_DIR/unittest.log" 2>&1 || rc=$?
+          echo "$rc" > "$CI_EVIDENCE_DIR/unittest.rc"
+          cat "$CI_EVIDENCE_DIR/unittest.log"
+          echo "unittest exit status: $rc"
+      - name: Gate the skips against the platform policy
+        # CI_REQUIRE_SYMLINKS is deliberately not set: on Windows a "cannot create symbolic links" skip is a
+        # ::warning:: until the capability probe (previous step; in the artifact) has shown that windows-latest can
+        # create symbolic links. Once it has, add `env: { CI_REQUIRE_SYMLINKS: '1' }` to this step (docs/ci.md).
+        shell: bash
+        run: >
+          python tests/ci_skip_policy.py --platform "$RUNNER_OS"
+          --log "$CI_EVIDENCE_DIR/unittest.log" --rc "$CI_EVIDENCE_DIR/unittest.rc"
+          --report "$CI_EVIDENCE_DIR/ci-skip-policy-report.txt"
+      - name: Upload the evidence (unittest log and exit status, capability probe, gating report, run info)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ci-evidence-${{ matrix.os }}-py${{ matrix.python }}
+          path: ${{ env.CI_EVIDENCE_DIR }}
+          if-no-files-found: error
+  crlf-checkout:
+    # F17 evidence. core.autocrlf=true is set BEFORE checkout, so the result does not depend on the runner image's git
+    # defaults. .gitattributes (eol=lf) must still produce LF working copies, and the same validate / schema / sync /
+    # suite / gating sequence must pass exactly as on the matrix Windows legs (a "checkout translated line endings"
+    # skip fails here too). The line-ending listing is recorded before validation so it is in the artifact even when
+    # validation fails.
+    name: crlf-checkout (windows-latest, py3.12, core.autocrlf=true)
     runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      CI_EVIDENCE_DIR: ${{ runner.temp }}/ci-evidence
     steps:
+      - name: Set core.autocrlf=true before checkout
+        shell: bash
+        run: |
+          git config --global core.autocrlf true
+          echo "core.autocrlf (global): $(git config --global --get core.autocrlf)"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
       - name: Confine TEMP and TMP to the runner temporary directory
         shell: pwsh
         run: |
-          $tmp = Join-Path $env:RUNNER_TEMP 'f1-junction-tmp'
-          $report = Join-Path $env:RUNNER_TEMP 'f1-junction-report'
-          New-Item -ItemType Directory -Force -Path $tmp, $report | Out-Null
+          $tmp = Join-Path $env:RUNNER_TEMP 'ci-tmp'
+          New-Item -ItemType Directory -Force -Path $tmp | Out-Null
           "TEMP=$tmp" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "TMP=$tmp" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "F1_REPORT_DIR=$report" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-      - name: Run the two Windows junction tests (focused unittest only)
-        shell: cmd
-        run: |
-          python -m unittest -v tests.test_fssafety.ChainTests.test_windows_junction_parent_refused tests.test_sync_adapters.RefusalTests.test_t1_2_windows_junction_parent_refused > "%F1_REPORT_DIR%\unittest-output.txt" 2>&1
-          echo %ERRORLEVEL% > "%F1_REPORT_DIR%\unittest-exit-code.txt"
-          exit /b 0
-      - name: Evaluate results and write the report (skip counts as failure)
-        shell: pwsh
+      - name: Prepare the evidence directory and record the run
+        shell: bash
         env:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          CHECKOUT_SHA: ${{ github.sha }}
         run: |
-          $dir = $env:F1_REPORT_DIR
-          $out = Get-Content -Raw (Join-Path $dir 'unittest-output.txt')
-          $code = (Get-Content (Join-Path $dir 'unittest-exit-code.txt') | Select-Object -First 1).Trim()
-          $os = Get-CimInstance Win32_OperatingSystem
-          $py = (python -c "import sys, platform; print(sys.version.replace(chr(10), ' ')); print(platform.platform())") -join ' | '
-          $tmpdir = python -c "import tempfile; print(tempfile.gettempdir())"
-          $tests = @(
-            'tests.test_fssafety.ChainTests.test_windows_junction_parent_refused',
-            'tests.test_sync_adapters.RefusalTests.test_t1_2_windows_junction_parent_refused'
-          )
-          $failures = @()
-          foreach ($t in $tests) {
-            $name = $t.Split('.')[-1]
-            $line = ($out -split "`r?`n") | Where-Object { $_ -match [regex]::Escape($name) } | Select-Object -First 1
-            if (-not $line) { $failures += "no result line for $t" }
-            elseif ($line -match '\.\.\. ok\s*$') { }
-            elseif ($line -match 'skipped') { $failures += "SKIPPED, treated as failure (junction capability unavailable): $line" }
-            else { $failures += "not ok: $line" }
-          }
-          if ($out -notmatch 'Ran 2 tests') { $failures += 'expected exactly 2 tests to run' }
-          if ($out -match '(?m)^FAILED') { $failures += 'unittest reported FAILED' }
-          if ($code -ne '0') { $failures += "unittest exit code $code" }
-          $status = if ($failures.Count -eq 0) { 'PASS' } else { 'FAIL' }
-          $report = @(
-            '# f1-windows-junction-validation report',
-            "workflow_run_id: $env:GITHUB_RUN_ID (attempt $env:GITHUB_RUN_ATTEMPT)",
-            "pr_head_sha: $env:PR_HEAD_SHA",
-            "checked_out_sha (github.sha; merge commit on pull_request events): $env:CHECKOUT_SHA",
-            "git_rev_parse_HEAD: $(git rev-parse HEAD)",
-            "windows: $($os.Caption) version $($os.Version) build $($os.BuildNumber); $([System.Environment]::OSVersion.VersionString); runner image $env:ImageOS $env:ImageVersion",
-            "python: $py",
-            "python_tempfile_gettempdir: $tmpdir",
-            "TEMP=$env:TEMP",
-            "TMP=$env:TMP",
-            "RUNNER_TEMP=$env:RUNNER_TEMP",
-            'executed_tests:'
-          ) + ($tests | ForEach-Object { "  - $_" }) + @(
-            "unittest_exit_code: $code",
-            'unittest_output:',
-            $out,
-            "verdict: $status"
-          ) + ($failures | ForEach-Object { "failure: $_" })
-          $report | Set-Content -Path (Join-Path $dir 'report.txt') -Encoding utf8
-          $report | Write-Output
-          if ($status -ne 'PASS') {
-            Write-Error ("f1-windows-junction-validation FAILED: " + ($failures -join '; '))
-            exit 1
-          }
-      - name: Upload the focused unittest output and report
+          mkdir -p "$CI_EVIDENCE_DIR"
+          {
+            echo "workflow_run: $GITHUB_RUN_ID attempt $GITHUB_RUN_ATTEMPT job $GITHUB_JOB"
+            echo "runner_os=$RUNNER_OS python=3.12 core.autocrlf=true set before checkout"
+            echo "github_sha (merge commit on pull_request events): $GITHUB_SHA"
+            echo "pr_head_sha: ${PR_HEAD_SHA:-n/a}"
+            echo "git_rev_parse_HEAD: $(git rev-parse HEAD)"
+            echo "core.autocrlf: $(git config --get core.autocrlf || echo unset)"
+            echo "core.eol: $(git config --get core.eol || echo unset)"
+            echo "python: $(python --version 2>&1)"
+          } | tee "$CI_EVIDENCE_DIR/run-info.txt"
+      - name: Record working-copy line endings (evidence that .gitattributes keeps LF under core.autocrlf=true)
+        shell: bash
+        run: |
+          git ls-files --eol -- '*.md' '*.py' '*.json' .gitattributes VERSION > "$CI_EVIDENCE_DIR/ls-files-eol.txt"
+          head -40 "$CI_EVIDENCE_DIR/ls-files-eol.txt"
+          echo "($(wc -l < "$CI_EVIDENCE_DIR/ls-files-eol.txt") entries in total; the full listing is in the artifact)"
+          git ls-files --eol > "$CI_EVIDENCE_DIR/ls-files-eol-all.txt"
+          echo "tracked files whose working copy has CRLF (every tracked file, any attribute):"
+          grep 'w/crlf' "$CI_EVIDENCE_DIR/ls-files-eol-all.txt" || echo "  (none)"
+      - name: Validate the repository
+        shell: bash
+        run: python scripts/validate.py
+      - name: Schema self-check
+        shell: bash
+        run: python scripts/schema_check.py --self-check
+      - name: Validate the templates against the schemas
+        shell: bash
+        run: python scripts/schema_check.py --templates
+      - name: Adapter parity
+        shell: bash
+        run: python scripts/sync_adapters.py --check
+      - name: Capability probe (evidence only; never fails)
+        shell: bash
+        run: python tests/ci_skip_policy.py --probe | tee "$CI_EVIDENCE_DIR/capability-probe.txt"
+      - name: Run the full unittest suite (output captured, exit status preserved)
+        shell: bash
+        run: |
+          rc=0
+          python -m unittest discover -s tests -v > "$CI_EVIDENCE_DIR/unittest.log" 2>&1 || rc=$?
+          echo "$rc" > "$CI_EVIDENCE_DIR/unittest.rc"
+          cat "$CI_EVIDENCE_DIR/unittest.log"
+          echo "unittest exit status: $rc"
+      - name: Gate the skips against the platform policy
+        # Same rules as the matrix Windows legs; see that job's step for CI_REQUIRE_SYMLINKS.
+        shell: bash
+        run: >
+          python tests/ci_skip_policy.py --platform "$RUNNER_OS"
+          --log "$CI_EVIDENCE_DIR/unittest.log" --rc "$CI_EVIDENCE_DIR/unittest.rc"
+          --report "$CI_EVIDENCE_DIR/ci-skip-policy-report.txt"
+      - name: Upload the evidence (unittest log and exit status, line-ending listings, probe, gating report)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: f1-windows-junction-validation
-          path: ${{ env.F1_REPORT_DIR }}
+          name: ci-evidence-crlf-checkout-windows-latest-py3.12
+          path: ${{ env.CI_EVIDENCE_DIR }}
           if-no-files-found: error
