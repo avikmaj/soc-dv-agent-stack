@@ -1,4 +1,5 @@
-"""Unit tests for scripts/fssafety.py (link-safe helpers behind the adapter sync; audit finding F1).
+"""Unit tests for scripts/fssafety.py (link-safe helpers behind the adapter sync and the installer; audit
+findings F1 and F2).
 
 Run: python3 -m unittest tests.test_fssafety -v
 
@@ -30,7 +31,7 @@ fs = _load()
 
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    path.write_bytes(text.encode("utf-8"))
 
 
 def _symlink_or_skip(case: unittest.TestCase, target: Path, link: Path) -> None:
@@ -185,9 +186,9 @@ class TreeTests(unittest.TestCase):
             _write(target / "a" / "SKILL.md", "alpha\n")
             _write(target / "b" / "SKILL.md", "beta\n")
             self.assertTrue(fs.trees_equal(f.source, target))
-            (target / "b" / "SKILL.md").write_text("changed\n")
+            (target / "b" / "SKILL.md").write_bytes(b"changed\n")
             self.assertFalse(fs.trees_equal(f.source, target))
-            (target / "b" / "SKILL.md").write_text("beta\n")
+            (target / "b" / "SKILL.md").write_bytes(b"beta\n")
             (target / "extra").mkdir()
             self.assertFalse(fs.trees_equal(f.source, target))  # an extra (even empty) directory is drift
             self.assertFalse(fs.trees_equal(f.source, f.root / "nowhere"))
@@ -217,7 +218,7 @@ class ReplaceTests(unittest.TestCase):
             msg = fs.replace_tree_atomically(f.root, f.source, target)
             self.assertTrue(msg.startswith("created"))
             self.assertTrue(fs.trees_equal(f.source, target))
-            (target / "a" / "SKILL.md").write_text("stale\n")
+            (target / "a" / "SKILL.md").write_bytes(b"stale\n")
             _write(target / "zombie" / "SKILL.md", "zombie\n")
             msg = fs.replace_tree_atomically(f.root, f.source, target)
             self.assertTrue(msg.startswith("replaced"))
@@ -303,6 +304,222 @@ class ReplaceTests(unittest.TestCase):
                 fs.replace_tree_atomically(f.root, f.source, target)
             self.assertEqual(_listing(f.root), before)
             self.assertFalse(target.exists())
+
+
+class FileHelperTests(unittest.TestCase):
+    """Single-file helpers behind scripts/bootstrap.py (audit finding F2)."""
+
+    def test_chain_state_reports_missing_tail_and_refuses_links(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Fixture(d)
+            self.assertEqual(fs.chain_state(f.root, f.root / ".claude" / "skills" / "x" / "SKILL.md"), (1, None))
+            existing, st = fs.chain_state(f.root, f.source / "a" / "SKILL.md")
+            self.assertEqual(existing, 3)
+            self.assertTrue(stat.S_ISREG(st.st_mode))
+            with self.assertRaises(fs.UnsafePathError):
+                fs.chain_state(f.root, f.root)
+            _symlink_or_skip(self, f.root / "nowhere", f.root / "dangling")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.chain_state(f.root, f.root / "dangling")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.chain_state(f.root, f.root / "dangling" / "child")
+
+    def test_classify_destination(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Fixture(d)
+            self.assertEqual(fs.classify_destination(f.root, f.root / "new.txt"), "missing")
+            self.assertEqual(fs.classify_destination(f.root, f.root / ".claude" / "skills" / "x.txt"), "missing")
+            self.assertEqual(fs.classify_destination(f.root, f.source / "a" / "SKILL.md"), "file")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.classify_destination(f.root, f.source)  # a directory
+            _symlink_or_skip(self, f.external / "SIBLING.txt", f.root / "link.txt")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.classify_destination(f.root, f.root / "link.txt")
+            linked = f.root / "linked.txt"
+            try:
+                os.link(f.source / "a" / "SKILL.md", linked)
+            except (OSError, NotImplementedError) as exc:
+                self.skipTest(f"hard links unavailable on this host: {exc}")
+            with self.assertRaises(fs.UnsafePathError) as cm:
+                fs.classify_destination(f.root, linked)
+            self.assertIn("hard links", str(cm.exception))
+            self.assertEqual(fs.classify_destination(f.root, linked, allow_hard_links=True), "file")
+
+    def test_write_regular_atomically_creates_replaces_and_refuses(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Fixture(d)
+            dst = f.root / "out.txt"
+            fs.write_regular_atomically(f.root, dst, b"one\n", mode=0o640, expect_existing=False)
+            self.assertEqual(dst.read_bytes(), b"one\n")
+            if os.name == "posix":
+                self.assertEqual(stat.S_IMODE(os.stat(dst).st_mode), 0o640)
+            fs.write_regular_atomically(f.root, dst, b"two\n", expect_existing=True)
+            self.assertEqual(dst.read_bytes(), b"two\n")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.write_regular_atomically(f.root, dst, b"x", expect_existing=False)
+            with self.assertRaises(fs.UnsafePathError):
+                fs.write_regular_atomically(f.root, f.root / "absent.txt", b"x", expect_existing=True)
+            with self.assertRaises(fs.UnsafePathError):
+                fs.write_regular_atomically(f.root, f.source, b"x")  # a directory
+            with self.assertRaises(fs.UnsafePathError):
+                fs.write_regular_atomically(f.root, f.root / "missing-dir" / "x.txt", b"x")  # parent missing
+            self.assertEqual(dst.read_bytes(), b"two\n")
+            self.assertEqual(sorted(p.name for p in f.root.iterdir()), [".claude", "out.txt", "skills"],
+                             "no temporary file may be left behind")
+            _symlink_or_skip(self, f.external / "SIBLING.txt", f.root / "link.txt")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.write_regular_atomically(f.root, f.root / "link.txt", b"leak\n")
+            self.assertEqual((f.external / "SIBLING.txt").read_text(encoding="utf-8"), "sibling\n")
+            _symlink_or_skip(self, f.external / "nothing-here", f.root / "dangling.txt")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.write_regular_atomically(f.root, f.root / "dangling.txt", b"leak\n")
+            self.assertFalse((f.external / "nothing-here").exists())
+
+    def test_write_failure_removes_temporary_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Fixture(d)
+            dst = f.root / "out.txt"
+            dst.write_bytes(b"old\n")
+            before = _listing(f.root)
+            with mock.patch.object(fs.os, "replace", side_effect=OSError(5, "injected rename failure")):
+                with self.assertRaises(OSError):
+                    fs.write_regular_atomically(f.root, dst, b"new\n")
+            self.assertEqual(_listing(f.root), before)
+
+    def test_mkdir_chain_rmdir_and_unlink(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Fixture(d)
+            created = fs.mkdir_chain(f.root, f.root / ".agents" / "skills" / "x")
+            self.assertEqual([p.relative_to(f.root).as_posix() for p in created],
+                             [".agents", ".agents/skills", ".agents/skills/x"])
+            self.assertEqual(fs.mkdir_chain(f.root, f.root / ".agents" / "skills"), [])
+            self.assertEqual(fs.mkdir_chain(f.root, f.root), [])
+            with self.assertRaises(fs.UnsafePathError):
+                fs.mkdir_chain(f.root, f.source / "a" / "SKILL.md" / "sub")  # a file in the chain
+            target = f.root / ".agents" / "skills" / "x" / "SKILL.md"
+            fs.write_regular_atomically(f.root, target, b"x\n")
+            self.assertFalse(fs.rmdir_if_empty(f.root, target.parent))
+            with self.assertRaises(fs.UnsafePathError):
+                fs.unlink_regular_nofollow(f.root, target, expect_sha256="0" * 64)
+            self.assertTrue(target.exists())
+            fs.unlink_regular_nofollow(f.root, target, expect_sha256=fs.sha256_bytes(b"x\n"))
+            self.assertFalse(target.exists())
+            self.assertTrue(fs.rmdir_if_empty(f.root, target.parent))
+            self.assertTrue(fs.rmdir_if_empty(f.root, target.parent))  # already gone
+            _symlink_or_skip(self, f.external / "SIBLING.txt", f.root / "link.txt")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.unlink_regular_nofollow(f.root, f.root / "link.txt")
+            self.assertTrue(os.path.islink(f.root / "link.txt"))
+
+    def test_read_and_replace_regular_nofollow(self):
+        with tempfile.TemporaryDirectory() as d:
+            f = Fixture(d)
+            self.assertEqual(fs.read_regular_nofollow(f.root, f.source / "a" / "SKILL.md"), b"alpha\n")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.read_regular_nofollow(f.root, f.root / "absent.txt")
+            _symlink_or_skip(self, f.external / "SIBLING.txt", f.root / "link.txt")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.read_regular_nofollow(f.root, f.root / "link.txt")
+            src = f.root / "moving.txt"
+            src.write_bytes(b"moved\n")
+            fs.replace_regular_nofollow(f.root, src, f.source / "a" / "SKILL.md")
+            self.assertFalse(src.exists())
+            self.assertEqual((f.source / "a" / "SKILL.md").read_bytes(), b"moved\n")
+            with self.assertRaises(fs.UnsafePathError):
+                fs.replace_regular_nofollow(f.root, f.root / "link.txt", f.root / "elsewhere.txt")
+
+
+class ReadOnlyAttributeTests(unittest.TestCase):
+    """F17: the Windows read-only attribute is cleared, behind an lstat guard, right before a delete or replace.
+
+    The guard logic is exercised on every platform with synthetic stat results; the real attribute semantics are
+    exercised on Windows only.
+    """
+
+    RO_FILE = types.SimpleNamespace(st_mode=stat.S_IFREG | 0o444, st_file_attributes=0x1, st_reparse_tag=0,
+                                    st_nlink=1)
+    RO_LINK = types.SimpleNamespace(st_mode=stat.S_IFLNK | 0o777, st_file_attributes=0x1 | 0x400,
+                                    st_reparse_tag=0xA000000C, st_nlink=1)
+    PLAIN = types.SimpleNamespace(st_mode=stat.S_IFREG | 0o644, st_file_attributes=0x20, st_reparse_tag=0, st_nlink=1)
+
+    def test_clear_readonly_is_platform_gated_and_never_follows_links(self):
+        with mock.patch.object(fs.os, "chmod") as chmod:
+            with mock.patch.object(fs, "_WINDOWS", False):
+                fs._clear_readonly(Path("x.txt"), self.RO_FILE)
+            chmod.assert_not_called()
+            with mock.patch.object(fs, "_WINDOWS", True):
+                fs._clear_readonly(Path("x.txt"), self.PLAIN)
+                chmod.assert_not_called()
+                fs._clear_readonly(Path("x.txt"), self.RO_FILE)
+                chmod.assert_called_once_with(Path("x.txt"), stat.S_IREAD | stat.S_IWRITE)
+                with self.assertRaises(fs.UnsafePathError):
+                    fs._clear_readonly(Path("link.txt"), self.RO_LINK)
+                chmod.assert_called_once()
+
+    def test_rmtree_retry_hook_clears_and_retries_only_read_only_plain_entries(self):
+        denied = PermissionError(13, "denied")
+        with mock.patch.object(fs, "_WINDOWS", True), mock.patch.object(fs.os, "chmod") as chmod, \
+                mock.patch.object(fs.os, "unlink") as unlink:
+            with mock.patch.object(fs, "_lstat", return_value=self.RO_FILE):
+                fs._retry_readonly_delete(fs.os.unlink, "victim.txt", denied)
+            chmod.assert_called_once_with(Path("victim.txt"), stat.S_IREAD | stat.S_IWRITE)
+            unlink.assert_called_once_with("victim.txt")
+            chmod.reset_mock()
+            unlink.reset_mock()
+            with mock.patch.object(fs, "_lstat", return_value=self.RO_LINK):
+                with self.assertRaises(PermissionError):
+                    fs._retry_readonly_delete(fs.os.unlink, "link.txt", denied)
+            with mock.patch.object(fs, "_lstat", return_value=self.PLAIN):
+                with self.assertRaises(PermissionError):
+                    fs._retry_readonly_delete(fs.os.unlink, "plain.txt", denied)
+            with mock.patch.object(fs, "_lstat", return_value=None):
+                with self.assertRaises(PermissionError):
+                    fs._retry_readonly_delete(fs.os.unlink, "gone.txt", denied)
+            with mock.patch.object(fs, "_lstat", return_value=self.RO_FILE):
+                with self.assertRaises(FileNotFoundError):
+                    fs._retry_readonly_delete(fs.os.unlink, "x.txt", FileNotFoundError(2, "gone"))
+                with self.assertRaises(PermissionError):
+                    fs._retry_readonly_delete(fs.os.scandir, "dir", denied)  # only deletes are retried
+            chmod.assert_not_called()
+            unlink.assert_not_called()
+
+    def test_rmtree_clearing_readonly_removes_a_plain_tree(self):
+        with tempfile.TemporaryDirectory() as d:
+            tree = Path(d) / "tree"
+            _write(tree / "sub" / "x.txt", "x\n")
+            _write(tree / "y.txt", "y\n")
+            fs._rmtree_clearing_readonly(tree)
+            self.assertFalse(tree.exists())
+            self.assertEqual(sorted(p.name for p in Path(d).iterdir()), [])
+
+    @unittest.skipUnless(sys.platform == "win32", "the read-only attribute exists only on Windows")
+    def test_windows_read_only_entries_are_deleted_and_replaced(self):  # pragma: no cover - Windows only
+        with tempfile.TemporaryDirectory() as d:
+            f = Fixture(d)
+            ro = f.root / "ro.txt"
+            ro.write_bytes(b"ro\n")
+            os.chmod(ro, stat.S_IREAD)
+            fs.unlink_regular_nofollow(f.root, ro, expect_sha256=fs.sha256_bytes(b"ro\n"))
+            self.assertFalse(ro.exists())
+            ro.write_bytes(b"ro\n")
+            os.chmod(ro, stat.S_IREAD)
+            fs.write_regular_atomically(f.root, ro, b"new\n", expect_existing=True)
+            self.assertEqual(ro.read_bytes(), b"new\n")
+            os.chmod(ro, stat.S_IREAD)
+            moving = f.root / "moving.txt"
+            moving.write_bytes(b"moved\n")
+            fs.replace_regular_nofollow(f.root, moving, ro)
+            self.assertEqual(ro.read_bytes(), b"moved\n")
+            tree = f.root / "tree"
+            _write(tree / "sub" / "x.txt", "x\n")
+            os.chmod(tree / "sub" / "x.txt", stat.S_IREAD)
+            fs.safe_rmtree(f.root, tree)
+            self.assertFalse(tree.exists())
+            empty = f.root / "empty"
+            empty.mkdir()
+            os.chmod(empty, stat.S_IREAD)
+            self.assertTrue(fs.rmdir_if_empty(f.root, empty))
+            self.assertFalse(empty.exists())
 
 
 if __name__ == "__main__":
