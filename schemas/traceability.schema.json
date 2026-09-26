@@ -49,6 +49,7 @@
               "open",
               "implemented",
               "passing",
+              "failing",
               "waived",
               "blocked"
             ]
