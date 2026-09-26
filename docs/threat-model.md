@@ -18,12 +18,12 @@ Confidential specifications and RTL; verification IP; credentials and license se
 ## Controls
 
 - No hooks, telemetry, remote MCPs, self-update, or runtime dependencies.
-- Project-local installation and explicit dry run.
+- Project-local installation with an explicit dry run. The installer refuses only the home directory and the filesystem root as targets and follows symbolic links present in the target (audit F2, F8).
 - Shell-free command execution from JSON argument arrays.
-- Approval gates for network, Git writes, deletion, installation, off-project paths, secrets, exclusions, and waivers.
+- Approval gates for network, Git writes, deletion, installation, off-project paths, secrets, exclusions, and waivers. These gates are contractual (`AGENTS.md`, `CLAUDE.md`); `scripts/run_tool.py` does not check for an approval record and executes whatever `argv` the project configuration names (audit F3).
 - Evidence taxonomy and mandatory residual-gap reporting.
 - SHA-pinned CI actions and adapter-drift checks.
-- Secret-pattern and unsafe-pattern validation.
+- Unsafe-pattern validation: a regex blocklist over `scripts/*` and `skills/*/SKILL.md` in `scripts/validate.py`. There is no secret-pattern scan (audit F7).
 
 ## Residual risk
 

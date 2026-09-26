@@ -10,7 +10,7 @@ Project skills are installed to `.agents/skills/<name>/SKILL.md`; `AGENTS.md` pr
 
 ## Parity rule
 
-Skill text must be byte-identical across canonical and generated locations. Run `python scripts/sync_adapters.py --check` to detect drift.
+Skill text must be byte-identical across canonical and generated locations. Run `python scripts/sync_adapters.py --check` to detect drift; it exits 1 on drift and modifies nothing. `python scripts/sync_adapters.py` without flags replaces both adapter trees with copies of `skills/` (exit codes and details in [scripts.md](scripts.md)).
 
 ## Cupel parity rule
 

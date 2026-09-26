@@ -2,11 +2,11 @@
 
 ## Canonical-first model
 
-`skills/` is the only hand-edited knowledge layer. `scripts/sync_adapters.py` deterministically materializes `.claude/skills/` and `.agents/skills/`. CI fails when adapters drift.
+`skills/` is the only hand-edited knowledge layer. `scripts/sync_adapters.py` deterministically materializes `.claude/skills/` and `.agents/skills/`, replacing their previous content with a byte-identical copy of `skills/` (`--check` reports drift without modifying anything; see [scripts.md](scripts.md)). CI fails when adapters drift.
 
 ## Control plane
 
-`AGENTS.md` and `CLAUDE.md` define authority, permissions, evidence, and output contracts. Skills cannot relax those rules. Project configuration selects tools and paths but cannot authorize network or destructive operations.
+`AGENTS.md` and `CLAUDE.md` define authority, permissions, evidence, and output contracts. Skills cannot relax those rules. Project configuration selects tools and paths but cannot authorize network or destructive operations. That limit is a rule of the contract, not of the code: `scripts/run_tool.py` executes whatever `argv` the configuration names and does not itself check for an approval record (audit F3; see [scripts.md](scripts.md)).
 
 ## Data plane
 
