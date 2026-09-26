@@ -1,19 +1,79 @@
+# Ignore policy for the SoC DV agent stack and for the DV projects this file is copied into (audit finding F12).
+# Never hide source, evidence or the canonical templates; keep patterns tight and DV-specific. A pattern with a
+# middle slash is relative to this file's directory unless it starts with **/; all others match at any depth.
+# tests/test_gitignore.py checks every pattern against synthetic paths and against every tracked file.
+
+# Python bytecode, virtual environments, test and tool caches, build output
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
 venv/
+dist/
+build/
+*.egg-info/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# Environment files (the committed example stays tracked)
 .env
 .env.*
 !.env.example
-.soc-dv/runs/
-.soc-dv/cache/
+
+# Stack-local state: scripts/bootstrap.py writes .soc-dv/config.json, install-manifest.json, journal/ and backups/,
+# scripts/run_tool.py writes runs/, all at the root of the project they act on. The **/ forms also cover a DV
+# project nested below this file (monorepo layout).
+**/.soc-dv/runs/
+**/.soc-dv/cache/
+**/.soc-dv/config.json
+**/.soc-dv/install-manifest.json
+**/.soc-dv/journal/
+**/.soc-dv/backups/
+
+# Simulator build output and logs (VCS simv/csrc/daidir, Xcelium xcelium.d/INCA_libs, Questa work/transcript)
 *.log
+simv
+simv.*
+csrc/
+*.daidir/
+xcelium.d/
+INCA_libs/
+work/
+transcript
+
+# Waveforms and dumps (VCD, FST, Questa WLF, Verdi FSDB, DVE VPD, Xcelium SHM database and its .trn/.dsn files)
 *.vcd
 *.fst
 *.wlf
 *.fsdb
+*.vpd
+*.shm/
+*.trn
+*.dsn
+
+# Coverage databases and debug-tool output (UCDB, VDB, Xcelium cov_work/, URG report, Verdi logs, DVE state)
 *.ucdb
 *.vdb/
+cov_work/
+urgReport/
+verdiLog/
+novas*
+DVEfiles/
+
+# Credentials and secret material (id_rsa.* and id_ed25519.* also match the public half; force-add it if wanted)
 *.key
 *.pem
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+.netrc
+.pypirc
+credentials*.json
+*.token
+*.secret
