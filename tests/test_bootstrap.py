@@ -45,7 +45,7 @@ INSTALLED_PATHS = {"CLAUDE.md", "AGENTS.md", ".soc-dv/config.json", ".claude/ski
 
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    path.write_bytes(text.encode("utf-8"))
 
 
 def sha(data: bytes) -> str:
@@ -240,7 +240,7 @@ class TargetAndPreflightTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             f = Fixture(d)
             regular = f.tmp / "regular.txt"
-            regular.write_text("not a directory\n", encoding="utf-8")
+            regular.write_bytes(b"not a directory\n")
             cases = [(f.tmp / "does-not-exist", "does not exist"), (regular, "not a directory"),
                      (f.home, "Refusing home/root target")]
             link = f.tmp / "link-to-target"

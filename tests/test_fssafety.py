@@ -31,7 +31,7 @@ fs = _load()
 
 def _write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    path.write_bytes(text.encode("utf-8"))
 
 
 def _symlink_or_skip(case: unittest.TestCase, target: Path, link: Path) -> None:
@@ -186,9 +186,9 @@ class TreeTests(unittest.TestCase):
             _write(target / "a" / "SKILL.md", "alpha\n")
             _write(target / "b" / "SKILL.md", "beta\n")
             self.assertTrue(fs.trees_equal(f.source, target))
-            (target / "b" / "SKILL.md").write_text("changed\n")
+            (target / "b" / "SKILL.md").write_bytes(b"changed\n")
             self.assertFalse(fs.trees_equal(f.source, target))
-            (target / "b" / "SKILL.md").write_text("beta\n")
+            (target / "b" / "SKILL.md").write_bytes(b"beta\n")
             (target / "extra").mkdir()
             self.assertFalse(fs.trees_equal(f.source, target))  # an extra (even empty) directory is drift
             self.assertFalse(fs.trees_equal(f.source, f.root / "nowhere"))
@@ -218,7 +218,7 @@ class ReplaceTests(unittest.TestCase):
             msg = fs.replace_tree_atomically(f.root, f.source, target)
             self.assertTrue(msg.startswith("created"))
             self.assertTrue(fs.trees_equal(f.source, target))
-            (target / "a" / "SKILL.md").write_text("stale\n")
+            (target / "a" / "SKILL.md").write_bytes(b"stale\n")
             _write(target / "zombie" / "SKILL.md", "zombie\n")
             msg = fs.replace_tree_atomically(f.root, f.source, target)
             self.assertTrue(msg.startswith("replaced"))
