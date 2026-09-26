@@ -1,4 +1,4 @@
-import hashlib, json, subprocess, sys, tempfile, unittest
+import json, subprocess, sys, tempfile, unittest
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 class StackTests(unittest.TestCase):
@@ -11,12 +11,15 @@ class StackTests(unittest.TestCase):
         for p in list((ROOT/'schemas').glob('*.json'))+list((ROOT/'templates').glob('*.json')): json.loads(p.read_text())
     def test_bootstrap_dry_run(self):
         with tempfile.TemporaryDirectory() as d:
-            r=subprocess.run([sys.executable,str(ROOT/'scripts'/'bootstrap.py'),'--target',d,'--harness','all','--dry-run'],capture_output=True,text=True)
+            cmd=[sys.executable,str(ROOT/'scripts'/'bootstrap.py'),'--target',str(Path(d).resolve()),'--harness','all']
+            r=subprocess.run(cmd+['--dry-run'],capture_output=True,text=True)
             self.assertEqual(r.returncode,0,r.stderr); self.assertFalse((Path(d)/'AGENTS.md').exists())
     def test_bootstrap_install(self):
         with tempfile.TemporaryDirectory() as d:
-            r=subprocess.run([sys.executable,str(ROOT/'scripts'/'bootstrap.py'),'--target',d,'--harness','all'],capture_output=True,text=True)
-            self.assertEqual(r.returncode,0,r.stderr); self.assertTrue((Path(d)/'.soc-dv/install-manifest.json').exists())
+            cmd=[sys.executable,str(ROOT/'scripts'/'bootstrap.py'),'--target',str(Path(d).resolve()),'--harness','all']
+            r=subprocess.run(cmd,capture_output=True,text=True)
+            self.assertEqual(r.returncode,0,r.stderr)
+            self.assertTrue((Path(d)/'.soc-dv/install-manifest.json').exists())
     def test_runner_rejects_escape(self):
         with tempfile.TemporaryDirectory() as d:
             p=Path(d)/'.soc-dv/config.json'; p.parent.mkdir(); p.write_text(json.dumps({'tools':{'x':{'argv':['echo','x'],'cwd':'../../'}}}))
