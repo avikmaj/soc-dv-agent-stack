@@ -4,6 +4,7 @@
   "allowed_workdirs": [
     "."
   ],
+  "max_timeout_seconds": 86400,
   "environment_allowlist": [
     "PATH",
     "HOME",
